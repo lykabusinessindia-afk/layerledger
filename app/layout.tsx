@@ -28,6 +28,16 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        <footer className="text-center text-gray-500 text-sm py-6 border-t border-gray-800">
+  <div className="space-x-4">
+    <a href="/privacy-policy" className="hover:text-green-400">
+      Privacy Policy
+    </a>
+    <a href="/terms" className="hover:text-green-400">
+      Terms of Service
+    </a>
+  </div>
+</footer>
       </body>
     </html>
   );
