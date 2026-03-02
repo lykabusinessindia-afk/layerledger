@@ -14,7 +14,6 @@ export default function Calculator() {
   const [feedback, setFeedback] = useState("");
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
-  const [projectName, setProjectName] = useState("");
   const [filamentUsed, setFilamentUsed] = useState(0);
   const [filamentPricePerKg, setFilamentPricePerKg] = useState(0);
   const [printTimeHours, setPrintTimeHours] = useState(0);
@@ -132,27 +131,25 @@ export default function Calculator() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white py-10 px-4">
+      <div className="max-w-4xl mx-auto">
 
-        <div className="flex items-center mb-8">
-  <div>
-    <h1 className="text-3xl font-bold text-white">
-      LayerLedger
-    </h1>
-    <p className="text-gray-400 text-sm">
-      Smart Cost & Profit Calculator for 3D Printing Sellers
-    </p>
-  </div>
+        {/* HEADER */}
+        <div className="relative mb-12 text-center">
+          <h1 className="text-4xl font-bold">LayerLedger</h1>
+          <p className="text-gray-400 mt-2">
+            Smart Cost & Profit Calculator for 3D Printing Sellers
+          </p>
 
-  <button
-    onClick={handleSignOut}
-    className="ml-auto bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-semibold"
-  >
-    Sign Out
-  </button>
-</div>
+          <button
+            onClick={handleSignOut}
+            className="absolute right-0 top-0 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-semibold"
+          >
+            Sign Out
+          </button>
+        </div>
 
+        {/* INPUTS */}
         <div className="flex flex-col gap-4 max-w-xl mx-auto">
           <input type="number" placeholder="Filament Used (grams)" className="p-3 rounded bg-gray-800" onChange={(e)=>setFilamentUsed(Number(e.target.value))}/>
           <input type="number" placeholder="Filament Price per KG" className="p-3 rounded bg-gray-800" onChange={(e)=>setFilamentPricePerKg(Number(e.target.value))}/>
@@ -166,7 +163,8 @@ export default function Calculator() {
           <input type="number" placeholder="GST %" className="p-3 rounded bg-gray-800" onChange={(e)=>setGstPercent(Number(e.target.value))}/>
         </div>
 
-        <div className="mt-12 bg-gray-900 p-6 rounded-xl max-w-xl mx-auto shadow-lg">
+        {/* COST BREAKDOWN */}
+        <div className="mt-14 bg-gray-900 p-6 rounded-xl max-w-xl mx-auto shadow-lg">
           <h2 className="text-xl font-semibold mb-4">Cost Breakdown</h2>
 
           <div className="space-y-2 text-gray-300">
@@ -200,65 +198,64 @@ export default function Calculator() {
         </div>
 
         {/* WAITLIST */}
-<div className="mt-12 p-8 bg-gray-900 rounded-xl border border-gray-700 max-w-2xl mx-auto shadow-lg">
+        <div className="mt-16 p-8 bg-gray-900 rounded-xl border border-gray-700 max-w-2xl mx-auto shadow-lg">
+          <h2 className="text-2xl font-bold text-green-400 mb-4">
+            🔥 LayerLedger Pro – Coming Soon
+          </h2>
 
-  <h2 className="text-2xl font-bold text-green-400 mb-4">
-    🔥 LayerLedger Pro – Coming Soon
-  </h2>
+          <p className="text-gray-400 mb-6">
+            Advanced tools built for serious 3D printing sellers.
+          </p>
 
-  <p className="text-gray-400 mb-6">
-    Advanced tools built for serious 3D printing sellers.
-  </p>
+          <ul className="space-y-3 text-gray-300 mb-8">
+            <li>🚀 STL File Upload with Auto Cost Detection</li>
+            <li>📦 Bulk Order Pricing Calculator</li>
+            <li>📊 Monthly Profit & Revenue Dashboard</li>
+            <li>💰 Filament Inventory & Cost Tracker</li>
+            <li>🧾 GST Invoice Generator (PDF Export)</li>
+            <li>🛒 Shopify Price Sync Integration</li>
+            <li>📁 Save & Export Project History</li>
+          </ul>
 
-  {/* Features List */}
-  <ul className="space-y-3 text-gray-300 mb-8">
-    <li>🚀 STL File Upload with Auto Cost Detection</li>
-    <li>📦 Bulk Order Pricing Calculator</li>
-    <li>📊 Monthly Profit & Revenue Dashboard</li>
-    <li>💰 Filament Inventory & Cost Tracker</li>
-    <li>🧾 GST Invoice Generator (PDF Export)</li>
-    <li>🛒 Shopify Price Sync Integration</li>
-    <li>📁 Save & Export Project History</li>
-  </ul>
+          <input
+            type="email"
+            placeholder="Enter your email"
+            value={waitlistEmail}
+            onChange={(e) => setWaitlistEmail(e.target.value)}
+            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white"
+          />
 
-  <input
-    type="email"
-    placeholder="Enter your email"
-    value={waitlistEmail}
-    onChange={(e) => setWaitlistEmail(e.target.value)}
-    className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white"
-  />
+          <button
+            onClick={handleWaitlist}
+            disabled={joining}
+            className="mt-4 w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold disabled:opacity-50"
+          >
+            {joining ? "Joining..." : "Join Waitlist"}
+          </button>
+        </div>
 
-  <button
-    onClick={handleWaitlist}
-    disabled={joining}
-    className="mt-4 w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold disabled:opacity-50"
-  >
-    {joining ? "Joining..." : "Join Waitlist"}
-  </button>
+        {/* FEEDBACK */}
+        <div className="mt-12 p-6 bg-gray-900 rounded-xl border border-gray-700 max-w-xl mx-auto">
+          <h3 className="text-lg font-semibold text-green-400 mb-3">
+            💬 Share Your Feedback
+          </h3>
 
-</div>
-        {/* FEEDBACK SECTION */}
-<div className="mt-10 p-6 bg-gray-900 rounded-xl border border-gray-700 max-w-xl mx-auto">
-  <h3 className="text-lg font-semibold text-green-400 mb-3">
-    💬 Share Your Feedback
-  </h3>
+          <textarea
+            placeholder="Share your feedback..."
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white min-h-[100px]"
+          />
 
-  <textarea
-    placeholder="Share your feedback..."
-    value={feedback}
-    onChange={(e) => setFeedback(e.target.value)}
-    className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white min-h-[100px]"
-  />
+          <button
+            onClick={handleFeedbackSubmit}
+            disabled={submittingFeedback}
+            className="mt-4 w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg font-semibold disabled:opacity-50"
+          >
+            {submittingFeedback ? "Submitting..." : "Submit Feedback"}
+          </button>
+        </div>
 
-  <button
-    onClick={handleFeedbackSubmit}
-    disabled={submittingFeedback}
-    className="mt-4 w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg font-semibold disabled:opacity-50"
-  >
-    {submittingFeedback ? "Submitting..." : "Submit Feedback"}
-  </button>
-</div>
       </div>
     </div>
   );
