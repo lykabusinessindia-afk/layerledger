@@ -135,22 +135,23 @@ export default function Calculator() {
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white">
       <div className="max-w-3xl mx-auto">
 
-        <div className="flex justify-end mb-4">
-          <button
-            onClick={handleSignOut}
-            className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm"
-          >
-            Sign Out
-          </button>
-        </div>
+        <div className="flex items-center mb-8">
+  <div>
+    <h1 className="text-3xl font-bold text-white">
+      LayerLedger
+    </h1>
+    <p className="text-gray-400 text-sm">
+      Smart Cost & Profit Calculator for 3D Printing Sellers
+    </p>
+  </div>
 
-        <h1 className="text-3xl font-bold mb-2 text-center">
-          LayerLedger
-        </h1>
-
-        <p className="text-gray-400 text-center mb-8">
-          Smart Cost & Profit Calculator for 3D Printing Sellers
-        </p>
+  <button
+    onClick={handleSignOut}
+    className="ml-auto bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-semibold"
+  >
+    Sign Out
+  </button>
+</div>
 
         <div className="flex flex-col gap-4 max-w-xl mx-auto">
           <input type="number" placeholder="Filament Used (grams)" className="p-3 rounded bg-gray-800" onChange={(e)=>setFilamentUsed(Number(e.target.value))}/>
