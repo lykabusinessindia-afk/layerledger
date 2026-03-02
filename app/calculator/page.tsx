@@ -194,6 +194,17 @@ export default function Calculator() {
               <span>Final Selling Price (Incl. GST)</span>
               <span>₹ {sellingPrice.toFixed(2)}</span>
             </div>
+            <button
+  onClick={() => {
+    navigator.clipboard.writeText(
+      `Final Selling Price (Incl. GST): ₹${sellingPrice.toFixed(2)}`
+    );
+    alert("Price copied 🚀");
+  }}
+  className="w-full mt-4 bg-green-600 hover:bg-green-700 p-3 rounded-lg font-bold"
+>
+  Copy Final Selling Price
+</button>
           </div>
         </div>
 
