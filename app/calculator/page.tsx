@@ -198,28 +198,45 @@ export default function Calculator() {
           </div>
         </div>
 
-        <div className="mt-10 p-6 bg-gray-900 rounded-xl border border-gray-700 max-w-xl mx-auto">
+        {/* WAITLIST */}
+<div className="mt-12 p-8 bg-gray-900 rounded-xl border border-gray-700 max-w-2xl mx-auto shadow-lg">
 
-          <h2 className="text-xl font-bold text-green-400 mb-3">
-            🔥 LayerLedger Pro Coming Soon
-          </h2>
+  <h2 className="text-2xl font-bold text-green-400 mb-4">
+    🔥 LayerLedger Pro – Coming Soon
+  </h2>
 
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={waitlistEmail}
-            onChange={(e)=>setWaitlistEmail(e.target.value)}
-            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white"
-          />
+  <p className="text-gray-400 mb-6">
+    Advanced tools built for serious 3D printing sellers.
+  </p>
 
-          <button
-            onClick={handleWaitlist}
-            disabled={joining}
-            className="mt-4 w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold disabled:opacity-50"
-          >
-            {joining ? "Joining..." : "Join Waitlist"}
-          </button>
-        </div>
+  {/* Features List */}
+  <ul className="space-y-3 text-gray-300 mb-8">
+    <li>🚀 STL File Upload with Auto Cost Detection</li>
+    <li>📦 Bulk Order Pricing Calculator</li>
+    <li>📊 Monthly Profit & Revenue Dashboard</li>
+    <li>💰 Filament Inventory & Cost Tracker</li>
+    <li>🧾 GST Invoice Generator (PDF Export)</li>
+    <li>🛒 Shopify Price Sync Integration</li>
+    <li>📁 Save & Export Project History</li>
+  </ul>
+
+  <input
+    type="email"
+    placeholder="Enter your email"
+    value={waitlistEmail}
+    onChange={(e) => setWaitlistEmail(e.target.value)}
+    className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white"
+  />
+
+  <button
+    onClick={handleWaitlist}
+    disabled={joining}
+    className="mt-4 w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold disabled:opacity-50"
+  >
+    {joining ? "Joining..." : "Join Waitlist"}
+  </button>
+
+</div>
         {/* FEEDBACK SECTION */}
 <div className="mt-10 p-6 bg-gray-900 rounded-xl border border-gray-700 max-w-xl mx-auto">
   <h3 className="text-lg font-semibold text-green-400 mb-3">
