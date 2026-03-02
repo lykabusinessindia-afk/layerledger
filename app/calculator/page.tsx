@@ -13,6 +13,10 @@ export default function Calculator() {
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const [joining, setJoining] = useState(false);
 
+  // 💬 Feedback
+  const [feedback, setFeedback] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
   // 🔹 Calculator States
   const [projectName, setProjectName] = useState("");
   const [filamentUsed, setFilamentUsed] = useState(0);
@@ -68,14 +72,11 @@ export default function Calculator() {
         .insert([{ email: waitlistEmail.toLowerCase() }]);
 
       if (error) {
-        console.log("Waitlist Error:", error);
-
         if (error.code === "23505") {
           alert("You are already on the waitlist 😉");
         } else {
           alert(error.message);
         }
-
         setJoining(false);
         return;
       }
@@ -84,10 +85,39 @@ export default function Calculator() {
       setWaitlistEmail("");
       setJoining(false);
 
-    } catch (err) {
-      console.log("Unexpected Error:", err);
+    } catch {
       alert("Unexpected error occurred.");
       setJoining(false);
+    }
+  };
+
+  // 💬 Feedback Handler
+  const handleFeedbackSubmit = async () => {
+    if (!feedback) {
+      alert("Please enter your feedback");
+      return;
+    }
+
+    try {
+      setSubmittingFeedback(true);
+
+      const { error } = await supabase
+        .from("feedback")
+        .insert([{ message: feedback }]);
+
+      if (error) {
+        alert(error.message);
+        setSubmittingFeedback(false);
+        return;
+      }
+
+      alert("Thank you for your feedback 🙌");
+      setFeedback("");
+      setSubmittingFeedback(false);
+
+    } catch {
+      alert("Unexpected error occurred.");
+      setSubmittingFeedback(false);
     }
   };
 
@@ -154,7 +184,7 @@ export default function Calculator() {
         {/* INPUTS */}
         <div className="flex flex-col gap-4 max-w-xl mx-auto">
 
-          <input type="text" placeholder="Project Name" value={projectName} className="p-3 rounded bg-gray-800" onChange={(e) => setProjectName(e.target.value)} />
+          <input type="text" placeholder="Project Name" className="p-3 rounded bg-gray-800" onChange={(e) => setProjectName(e.target.value)} />
           <input type="number" placeholder="Filament Used (grams)" className="p-3 rounded bg-gray-800" onChange={(e) => setFilamentUsed(Number(e.target.value))}/>
           <input type="number" placeholder="Filament Price per KG" className="p-3 rounded bg-gray-800" onChange={(e) => setFilamentPricePerKg(Number(e.target.value))}/>
           <input type="number" placeholder="Print Time (hours)" className="p-3 rounded bg-gray-800" onChange={(e) => setPrintTimeHours(Number(e.target.value))}/>
@@ -210,43 +240,77 @@ export default function Calculator() {
             >
               Copy Final Selling Price
             </button>
-
-            {/* PRO SECTION */}
-            <div className="mt-10 p-6 bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl border border-gray-700">
-              <h2 className="text-xl font-bold text-green-400 mb-3">
-                🔥 LayerLedger Pro Coming Soon
-              </h2>
-
-              <ul className="text-gray-300 space-y-2 text-sm">
-                <li>• Save projects</li>
-                <li>• Profit analytics</li>
-                <li>• GST invoice export</li>
-                <li>• Material presets</li>
-              </ul>
-
-              <p className="mt-4 text-gray-400 text-sm">
-                Join waitlist to get early access.
-              </p>
-
-              {/* EMAIL INPUT MOVED HERE */}
-              <input
-                type="email"
-                placeholder="Enter your email"
-                value={waitlistEmail}
-                onChange={(e) => setWaitlistEmail(e.target.value)}
-                className="mt-4 w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-white placeholder-gray-500"
-              />
-
-              <button
-                onClick={handleWaitlist}
-                disabled={joining}
-                className="mt-4 w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold text-sm disabled:opacity-50"
-              >
-                {joining ? "Joining..." : "Join Waitlist"}
-              </button>
-            </div>
-
           </div>
+        </div>
+
+        {/* WAITLIST */}
+        <div className="mt-10 p-6 bg-gray-900 rounded-xl border border-gray-700 max-w-xl mx-auto">
+          <h2 className="text-xl font-bold text-green-400 mb-3">
+            🔥 LayerLedger Pro Coming Soon
+          </h2>
+
+          <p className="text-gray-400 text-sm mb-4">
+            Join waitlist to get early access.
+          </p>
+
+          <input
+            type="email"
+            placeholder="Enter your email"
+            value={waitlistEmail}
+            onChange={(e) => setWaitlistEmail(e.target.value)}
+            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white"
+          />
+
+          <button
+            onClick={handleWaitlist}
+            disabled={joining}
+            className="mt-4 w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold disabled:opacity-50"
+          >
+            {joining ? "Joining..." : "Join Waitlist"}
+          </button>
+          <div className="mt-8 border-t border-gray-700 pt-6">
+  <h3 className="text-lg font-semibold text-green-400 mb-3">
+    💬 Give Feedback
+  </h3>
+
+  <textarea
+    placeholder="Share your feedback..."
+    value={feedback}
+    onChange={(e) => setFeedback(e.target.value)}
+    className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-white min-h-[100px]"
+  />
+
+  <button
+    onClick={handleFeedbackSubmit}
+    disabled={submittingFeedback}
+    className="mt-4 w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg font-semibold text-sm disabled:opacity-50"
+  >
+    {submittingFeedback ? "Submitting..." : "Submit Feedback"}
+  </button>
+</div>
+        </div>
+
+        {/* FEEDBACK */}
+        <div className="mt-10 p-6 bg-gray-900 rounded-xl border border-gray-700 max-w-xl mx-auto">
+          <h2 className="text-xl font-bold text-green-400 mb-3">
+            💬 Share Your Feedback
+          </h2>
+
+          <textarea
+            placeholder="Write your feedback..."
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            rows={4}
+            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white"
+          />
+
+          <button
+            onClick={handleFeedbackSubmit}
+            disabled={submittingFeedback}
+            className="mt-4 w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold disabled:opacity-50"
+          >
+            {submittingFeedback ? "Submitting..." : "Submit Feedback"}
+          </button>
         </div>
 
       </div>
