@@ -220,6 +220,27 @@ export default function Calculator() {
             {joining ? "Joining..." : "Join Waitlist"}
           </button>
         </div>
+        {/* FEEDBACK SECTION */}
+<div className="mt-10 p-6 bg-gray-900 rounded-xl border border-gray-700 max-w-xl mx-auto">
+  <h3 className="text-lg font-semibold text-green-400 mb-3">
+    💬 Share Your Feedback
+  </h3>
+
+  <textarea
+    placeholder="Share your feedback..."
+    value={feedback}
+    onChange={(e) => setFeedback(e.target.value)}
+    className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white min-h-[100px]"
+  />
+
+  <button
+    onClick={handleFeedbackSubmit}
+    disabled={submittingFeedback}
+    className="mt-4 w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg font-semibold disabled:opacity-50"
+  >
+    {submittingFeedback ? "Submitting..." : "Submit Feedback"}
+  </button>
+</div>
       </div>
     </div>
   );
