@@ -136,14 +136,14 @@ export default function Calculator() {
 
         {/* HEADER */}
         <div className="relative mb-12 text-center">
-          <h1 className="text-4xl font-bold">
+          <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight">
   <span className="text-white">Layer</span>
-  <span className="text-green-400">Ledger</span>
+  <span className="text-green-400 ml-1">Ledger</span>
 </h1>
 
-          <p className="text-gray-400 mt-2">
-            Smart Cost & Profit Calculator for 3D Printing Sellers
-          </p>
+          <p className="text-gray-400 mt-4 text-lg font-medium tracking-wide">
+  Turn Your 3D Prints Into Profitable Products
+</p>
 
           <button
             onClick={handleSignOut}
