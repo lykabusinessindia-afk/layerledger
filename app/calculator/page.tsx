@@ -6,18 +6,14 @@ import { supabase } from "@/lib/supabase";
 export default function Calculator() {
   const router = useRouter();
 
-  // 🔐 Auth
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // 🔥 Waitlist
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const [joining, setJoining] = useState(false);
 
-  // 💬 Feedback
   const [feedback, setFeedback] = useState("");
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
-  // 🔹 Calculator States
   const [projectName, setProjectName] = useState("");
   const [filamentUsed, setFilamentUsed] = useState(0);
   const [filamentPricePerKg, setFilamentPricePerKg] = useState(0);
@@ -30,53 +26,37 @@ export default function Calculator() {
   const [gstPercent, setGstPercent] = useState(0);
   const [profitMargin, setProfitMargin] = useState(30);
 
-  // 🔐 Authentication Check
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
-
       if (!data.session) {
         router.push("/login");
       } else {
         setCheckingAuth(false);
       }
     };
-
     checkUser();
   }, [router]);
 
-  // 🔓 Sign Out
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push("/");
   };
 
-  // 🔥 Waitlist Handler
   const handleWaitlist = async () => {
     if (!waitlistEmail) {
       alert("Please enter your email");
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(waitlistEmail)) {
-      alert("Enter a valid email address");
-      return;
-    }
-
     try {
       setJoining(true);
-
       const { error } = await supabase
         .from("waitlist")
         .insert([{ email: waitlistEmail.toLowerCase() }]);
 
       if (error) {
-        if (error.code === "23505") {
-          alert("You are already on the waitlist 😉");
-        } else {
-          alert(error.message);
-        }
+        alert(error.message);
         setJoining(false);
         return;
       }
@@ -84,14 +64,12 @@ export default function Calculator() {
       alert("You're on the waitlist 🚀");
       setWaitlistEmail("");
       setJoining(false);
-
     } catch {
       alert("Unexpected error occurred.");
       setJoining(false);
     }
   };
 
-  // 💬 Feedback Handler
   const handleFeedbackSubmit = async () => {
     if (!feedback) {
       alert("Please enter your feedback");
@@ -100,7 +78,6 @@ export default function Calculator() {
 
     try {
       setSubmittingFeedback(true);
-
       const { error } = await supabase
         .from("feedback")
         .insert([{ message: feedback }]);
@@ -114,23 +91,18 @@ export default function Calculator() {
       alert("Thank you for your feedback 🙌");
       setFeedback("");
       setSubmittingFeedback(false);
-
     } catch {
       alert("Unexpected error occurred.");
       setSubmittingFeedback(false);
     }
   };
 
-  // 🔹 Calculations
   const filamentCost = (filamentUsed / 1000) * filamentPricePerKg;
 
   const electricityCost =
-    (machinePowerWatts / 1000) *
-    printTimeHours *
-    electricityRate;
+    (machinePowerWatts / 1000) * printTimeHours * electricityRate;
 
-  const machineCost =
-    machineCostPerHour * printTimeHours;
+  const machineCost = machineCostPerHour * printTimeHours;
 
   const totalCost =
     filamentCost +
@@ -160,10 +132,9 @@ export default function Calculator() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white p-6">
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white">
       <div className="max-w-3xl mx-auto">
 
-        {/* Sign Out */}
         <div className="flex justify-end mb-4">
           <button
             onClick={handleSignOut}
@@ -181,23 +152,19 @@ export default function Calculator() {
           Smart Cost & Profit Calculator for 3D Printing Sellers
         </p>
 
-        {/* INPUTS */}
         <div className="flex flex-col gap-4 max-w-xl mx-auto">
-
-          <input type="text" placeholder="Project Name" className="p-3 rounded bg-gray-800" onChange={(e) => setProjectName(e.target.value)} />
-          <input type="number" placeholder="Filament Used (grams)" className="p-3 rounded bg-gray-800" onChange={(e) => setFilamentUsed(Number(e.target.value))}/>
-          <input type="number" placeholder="Filament Price per KG" className="p-3 rounded bg-gray-800" onChange={(e) => setFilamentPricePerKg(Number(e.target.value))}/>
-          <input type="number" placeholder="Print Time (hours)" className="p-3 rounded bg-gray-800" onChange={(e) => setPrintTimeHours(Number(e.target.value))}/>
-          <input type="number" placeholder="Electricity Rate (per kWh)" className="p-3 rounded bg-gray-800" onChange={(e) => setElectricityRate(Number(e.target.value))}/>
-          <input type="number" placeholder="Machine Power (Watts)" className="p-3 rounded bg-gray-800" onChange={(e) => setMachinePowerWatts(Number(e.target.value))}/>
-          <input type="number" placeholder="Machine Cost Per Hour" className="p-3 rounded bg-gray-800" onChange={(e) => setMachineCostPerHour(Number(e.target.value))}/>
-          <input type="number" placeholder="Packaging Cost" className="p-3 rounded bg-gray-800" onChange={(e) => setPackagingCost(Number(e.target.value))}/>
-          <input type="number" placeholder="Shipping Cost" className="p-3 rounded bg-gray-800" onChange={(e) => setShippingCost(Number(e.target.value))}/>
-          <input type="number" placeholder="Profit Margin %" defaultValue={30} className="p-3 rounded bg-gray-800" onChange={(e) => setProfitMargin(Number(e.target.value))}/>
-          <input type="number" placeholder="GST %" className="p-3 rounded bg-gray-800" onChange={(e) => setGstPercent(Number(e.target.value))}/>
+          <input type="number" placeholder="Filament Used (grams)" className="p-3 rounded bg-gray-800" onChange={(e)=>setFilamentUsed(Number(e.target.value))}/>
+          <input type="number" placeholder="Filament Price per KG" className="p-3 rounded bg-gray-800" onChange={(e)=>setFilamentPricePerKg(Number(e.target.value))}/>
+          <input type="number" placeholder="Print Time (hours)" className="p-3 rounded bg-gray-800" onChange={(e)=>setPrintTimeHours(Number(e.target.value))}/>
+          <input type="number" placeholder="Electricity Rate (per kWh)" className="p-3 rounded bg-gray-800" onChange={(e)=>setElectricityRate(Number(e.target.value))}/>
+          <input type="number" placeholder="Machine Power (Watts)" className="p-3 rounded bg-gray-800" onChange={(e)=>setMachinePowerWatts(Number(e.target.value))}/>
+          <input type="number" placeholder="Machine Cost Per Hour" className="p-3 rounded bg-gray-800" onChange={(e)=>setMachineCostPerHour(Number(e.target.value))}/>
+          <input type="number" placeholder="Packaging Cost" className="p-3 rounded bg-gray-800" onChange={(e)=>setPackagingCost(Number(e.target.value))}/>
+          <input type="number" placeholder="Shipping Cost" className="p-3 rounded bg-gray-800" onChange={(e)=>setShippingCost(Number(e.target.value))}/>
+          <input type="number" placeholder="Profit Margin %" defaultValue={30} className="p-3 rounded bg-gray-800" onChange={(e)=>setProfitMargin(Number(e.target.value))}/>
+          <input type="number" placeholder="GST %" className="p-3 rounded bg-gray-800" onChange={(e)=>setGstPercent(Number(e.target.value))}/>
         </div>
 
-        {/* RESULTS */}
         <div className="mt-12 bg-gray-900 p-6 rounded-xl max-w-xl mx-auto shadow-lg">
           <h2 className="text-xl font-semibold mb-4">Cost Breakdown</h2>
 
@@ -228,36 +195,20 @@ export default function Calculator() {
               <span>Final Selling Price (Incl. GST)</span>
               <span>₹ {sellingPrice.toFixed(2)}</span>
             </div>
-
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(
-                  `Final Selling Price (Incl. GST): ₹${sellingPrice.toFixed(2)}`
-                );
-                alert("Price copied 🚀");
-              }}
-              className="w-full mt-4 bg-green-600 hover:bg-green-700 p-3 rounded font-bold"
-            >
-              Copy Final Selling Price
-            </button>
           </div>
         </div>
 
-        {/* WAITLIST */}
         <div className="mt-10 p-6 bg-gray-900 rounded-xl border border-gray-700 max-w-xl mx-auto">
+
           <h2 className="text-xl font-bold text-green-400 mb-3">
             🔥 LayerLedger Pro Coming Soon
           </h2>
-
-          <p className="text-gray-400 text-sm mb-4">
-            Join waitlist to get early access.
-          </p>
 
           <input
             type="email"
             placeholder="Enter your email"
             value={waitlistEmail}
-            onChange={(e) => setWaitlistEmail(e.target.value)}
+            onChange={(e)=>setWaitlistEmail(e.target.value)}
             className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white"
           />
 
@@ -268,51 +219,7 @@ export default function Calculator() {
           >
             {joining ? "Joining..." : "Join Waitlist"}
           </button>
-          <div className="mt-8 border-t border-gray-700 pt-6">
-  <h3 className="text-lg font-semibold text-green-400 mb-3">
-    💬 Give Feedback
-  </h3>
-
-  <textarea
-    placeholder="Share your feedback..."
-    value={feedback}
-    onChange={(e) => setFeedback(e.target.value)}
-    className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 text-white min-h-[100px]"
-  />
-
-  <button
-    onClick={handleFeedbackSubmit}
-    disabled={submittingFeedback}
-    className="mt-4 w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg font-semibold text-sm disabled:opacity-50"
-  >
-    {submittingFeedback ? "Submitting..." : "Submit Feedback"}
-  </button>
-</div>
         </div>
-
-        {/* FEEDBACK */}
-        <div className="mt-10 p-6 bg-gray-900 rounded-xl border border-gray-700 max-w-xl mx-auto">
-          <h2 className="text-xl font-bold text-green-400 mb-3">
-            💬 Share Your Feedback
-          </h2>
-
-          <textarea
-            placeholder="Write your feedback..."
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            rows={4}
-            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white"
-          />
-
-          <button
-            onClick={handleFeedbackSubmit}
-            disabled={submittingFeedback}
-            className="mt-4 w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold disabled:opacity-50"
-          >
-            {submittingFeedback ? "Submitting..." : "Submit Feedback"}
-          </button>
-        </div>
-
       </div>
     </div>
   );
