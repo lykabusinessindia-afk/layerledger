@@ -137,25 +137,22 @@ export default function Calculator() {
   <input
   type="number"
   placeholder="Failure Rate %"
-  value={failureRate}
   className="w-full p-3 rounded bg-gray-800"
   onChange={(e) => setFailureRate(Number(e.target.value))}
-/>
+ />
 </div>
           <input
   type="number"
   placeholder="Profit Margin %"
-  value={profitMargin}
   className="w-full p-3 rounded bg-gray-800"
   onChange={(e) => setProfitMargin(Number(e.target.value))}
-/>
+ />
           <input
   type="number"
   placeholder="GST %"
-  value={gstPercent}
   className="w-full p-3 rounded bg-gray-800"
   onChange={(e) => setGstPercent(Number(e.target.value))}
-/>
+ />
         </div>
 
         {/* COST BREAKDOWN */}
