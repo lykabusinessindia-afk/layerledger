@@ -111,7 +111,7 @@ export default function Calculator() {
   shippingCost +
   machineCost;
 
-// 🔥 Add failure adjustment
+//Add failure adjustment
 const adjustedCost =
   totalCost * (1 + failureRate / 100);
 
