@@ -133,7 +133,17 @@ export default function Calculator() {
           <input type="number" placeholder="Machine Cost Per Hour" className="p-3 rounded bg-gray-800" onChange={(e)=>setMachineCostPerHour(Number(e.target.value))}/>
           <input type="number" placeholder="Packaging Cost" className="p-3 rounded bg-gray-800" onChange={(e)=>setPackagingCost(Number(e.target.value))}/>
           <input type="number" placeholder="Shipping Cost" className="p-3 rounded bg-gray-800" onChange={(e)=>setShippingCost(Number(e.target.value))}/>
-          <input type="number" value={failureRate} placeholder="Failure Rate %" className="p-3 rounded bg-gray-800" onChange={(e)=>setFailureRate(Number(e.target.value))}/>
+          <div>
+  <label className="block text-sm text-gray-400 mb-1">
+    Failure Rate % (Recommended 5–10%)
+  </label>
+  <input
+    type="number"
+    value={failureRate}
+    className="w-full p-3 rounded bg-gray-800"
+    onChange={(e) => setFailureRate(Number(e.target.value))}
+  />
+</div>
           <input type="number" value={profitMargin} placeholder="Profit Margin %" className="p-3 rounded bg-gray-800" onChange={(e)=>setProfitMargin(Number(e.target.value))}/>
           <input type="number" placeholder="GST %" className="p-3 rounded bg-gray-800" onChange={(e)=>setGstPercent(Number(e.target.value))}/>
         </div>
