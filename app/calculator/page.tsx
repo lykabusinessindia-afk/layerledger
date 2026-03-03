@@ -22,6 +22,7 @@ export default function Calculator() {
   const [machineCostPerHour, setMachineCostPerHour] = useState(0);
   const [packagingCost, setPackagingCost] = useState(0);
   const [shippingCost, setShippingCost] = useState(0);
+  const [failureRate, setFailureRate] = useState(5);
   const [gstPercent, setGstPercent] = useState(0);
   const [profitMargin, setProfitMargin] = useState(30);
 
@@ -104,23 +105,27 @@ export default function Calculator() {
   const machineCost = machineCostPerHour * printTimeHours;
 
   const totalCost =
-    filamentCost +
-    electricityCost +
-    packagingCost +
-    shippingCost +
-    machineCost;
+  filamentCost +
+  electricityCost +
+  packagingCost +
+  shippingCost +
+  machineCost;
 
-  const baseSellingPrice =
-    totalCost + (totalCost * profitMargin) / 100;
+// 🔥 Add failure adjustment
+const adjustedCost =
+  totalCost * (1 + failureRate / 100);
 
-  const gstAmount =
-    (baseSellingPrice * gstPercent) / 100;
+const baseSellingPrice =
+  adjustedCost + (adjustedCost * profitMargin) / 100;
 
-  const sellingPrice =
-    baseSellingPrice + gstAmount;
+const gstAmount =
+  (baseSellingPrice * gstPercent) / 100;
 
-  const profitAmount =
-    baseSellingPrice - totalCost;
+const sellingPrice =
+  baseSellingPrice + gstAmount;
+
+const profitAmount =
+  baseSellingPrice - adjustedCost;
 
   if (checkingAuth) {
     return (
@@ -154,18 +159,69 @@ export default function Calculator() {
         </div>
 
         {/* INPUTS */}
-        <div className="flex flex-col gap-4 max-w-xl mx-auto">
-          <input type="number" placeholder="Filament Used (grams)" className="p-3 rounded bg-gray-800" onChange={(e)=>setFilamentUsed(Number(e.target.value))}/>
-          <input type="number" placeholder="Filament Price per KG" className="p-3 rounded bg-gray-800" onChange={(e)=>setFilamentPricePerKg(Number(e.target.value))}/>
-          <input type="number" placeholder="Print Time (hours)" className="p-3 rounded bg-gray-800" onChange={(e)=>setPrintTimeHours(Number(e.target.value))}/>
-          <input type="number" placeholder="Electricity Rate (per kWh)" className="p-3 rounded bg-gray-800" onChange={(e)=>setElectricityRate(Number(e.target.value))}/>
-          <input type="number" placeholder="Machine Power (Watts)" className="p-3 rounded bg-gray-800" onChange={(e)=>setMachinePowerWatts(Number(e.target.value))}/>
-          <input type="number" placeholder="Machine Cost Per Hour" className="p-3 rounded bg-gray-800" onChange={(e)=>setMachineCostPerHour(Number(e.target.value))}/>
-          <input type="number" placeholder="Packaging Cost" className="p-3 rounded bg-gray-800" onChange={(e)=>setPackagingCost(Number(e.target.value))}/>
-          <input type="number" placeholder="Shipping Cost" className="p-3 rounded bg-gray-800" onChange={(e)=>setShippingCost(Number(e.target.value))}/>
-          <input type="number" placeholder="Profit Margin %" defaultValue={30} className="p-3 rounded bg-gray-800" onChange={(e)=>setProfitMargin(Number(e.target.value))}/>
-          <input type="number" placeholder="GST %" className="p-3 rounded bg-gray-800" onChange={(e)=>setGstPercent(Number(e.target.value))}/>
-        </div>
+<div className="flex flex-col gap-4 max-w-xl mx-auto">
+
+  <input type="number" placeholder="Filament Used (grams)"
+    className="p-3 rounded bg-gray-800"
+    onChange={(e)=>setFilamentUsed(Number(e.target.value))}
+  />
+
+  <input type="number" placeholder="Filament Price per KG"
+    className="p-3 rounded bg-gray-800"
+    onChange={(e)=>setFilamentPricePerKg(Number(e.target.value))}
+  />
+
+  <input type="number" placeholder="Print Time (hours)"
+    className="p-3 rounded bg-gray-800"
+    onChange={(e)=>setPrintTimeHours(Number(e.target.value))}
+  />
+
+  <input type="number" placeholder="Electricity Rate (per kWh)"
+    className="p-3 rounded bg-gray-800"
+    onChange={(e)=>setElectricityRate(Number(e.target.value))}
+  />
+
+  <input type="number" placeholder="Machine Power (Watts)"
+    className="p-3 rounded bg-gray-800"
+    onChange={(e)=>setMachinePowerWatts(Number(e.target.value))}
+  />
+
+  <input type="number" placeholder="Machine Cost Per Hour"
+    className="p-3 rounded bg-gray-800"
+    onChange={(e)=>setMachineCostPerHour(Number(e.target.value))}
+  />
+
+  <input type="number" placeholder="Packaging Cost"
+    className="p-3 rounded bg-gray-800"
+    onChange={(e)=>setPackagingCost(Number(e.target.value))}
+  />
+
+  <input type="number" placeholder="Shipping Cost"
+    className="p-3 rounded bg-gray-800"
+    onChange={(e)=>setShippingCost(Number(e.target.value))}
+  />
+
+  <input type="number"
+    placeholder="Failure Rate % (Recommended 5-10%)"
+    value={failureRate}
+    className="p-3 rounded bg-gray-800"
+    onChange={(e)=>setFailureRate(Number(e.target.value))}
+  />
+
+  <input type="number"
+    placeholder="Profit Margin %"
+    value={profitMargin}
+    className="p-3 rounded bg-gray-800"
+    onChange={(e)=>setProfitMargin(Number(e.target.value))}
+  />
+
+  <input type="number"
+    placeholder="GST %"
+    className="p-3 rounded bg-gray-800"
+    onChange={(e)=>setGstPercent(Number(e.target.value))}
+  />
+
+</div>
 
         {/* COST BREAKDOWN */}
         <div className="mt-14 bg-gray-900 p-6 rounded-xl max-w-xl mx-auto shadow-lg">

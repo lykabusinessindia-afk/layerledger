@@ -10,6 +10,9 @@ export default function Home() {
   const [showLogin, setShowLogin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
   // 🔐 Listen for successful login
   useEffect(() => {
@@ -21,7 +24,7 @@ export default function Home() {
 
           setTimeout(() => {
             router.push("/calculator");
-          }, 1200);
+          }, 800);
         }
       }
     );
@@ -38,12 +41,16 @@ export default function Home() {
       return;
     }
 
+    setAuthLoading(true);
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: "http://localhost:3000/calculator",
+        emailRedirectTo: `${siteUrl}/calculator`,
       },
     });
+
+    setAuthLoading(false);
 
     if (error) {
       alert(error.message);
@@ -54,46 +61,49 @@ export default function Home() {
 
   // 🌍 Google Login
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
+    setAuthLoading(true);
+
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: "http://localhost:3000/calculator",
+        redirectTo: `${siteUrl}/calculator`,
       },
     });
+
+    if (error) {
+      setAuthLoading(false);
+      alert(error.message);
+    }
   };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white flex flex-col items-center justify-center px-6 relative">
 
-      {/* LOGO */}
       <h1 className="text-6xl md:text-7xl font-extrabold mb-6 tracking-tight">
         Layer<span className="text-green-500">Ledger</span>
       </h1>
 
-      {/* TAGLINE */}
       <p className="text-xl md:text-2xl text-gray-300 text-center max-w-2xl mb-12 leading-relaxed">
-  The Simplest Way to Price Your 3D Prints Profitably.
-  <br />
-  Know your real cost. Price with confidence.
-</p>
+        The Simplest Way to Price Your 3D Prints Profitably.
+        <br />
+        Know your real cost. Price with confidence.
+      </p>
 
-      {/* LAUNCH BUTTON */}
       <button
-  onClick={async () => {
-    const { data } = await supabase.auth.getSession();
+        onClick={async () => {
+          const { data } = await supabase.auth.getSession();
 
-    if (data.session) {
-      router.push("/calculator");
-    } else {
-      setShowLogin(true);
-    }
-  }}
-  className="bg-green-600 hover:bg-green-700 transition-all duration-300 px-10 py-4 rounded-xl"
->
-  Launch Calculator
-</button>
+          if (data.session) {
+            router.push("/calculator");
+          } else {
+            setShowLogin(true);
+          }
+        }}
+        className="bg-green-600 hover:bg-green-700 transition-all duration-300 px-10 py-4 rounded-xl"
+      >
+        Launch Calculator
+      </button>
 
-      {/* LOGIN MODAL */}
       {showLogin && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-gray-900 border border-gray-700 p-10 rounded-3xl w-[95%] max-w-md shadow-2xl">
@@ -102,22 +112,20 @@ export default function Home() {
               Sign in to continue
             </h2>
 
-            {/* Google Button */}
             <button
               onClick={handleGoogleLogin}
-              className="w-full bg-white text-black py-3 rounded-xl font-semibold mb-4 hover:opacity-90 transition"
+              disabled={authLoading}
+              className="w-full bg-white text-black py-3 rounded-xl font-semibold mb-4 hover:opacity-90 transition disabled:opacity-50"
             >
-              Continue with Google
+              {authLoading ? "Redirecting..." : "Continue with Google"}
             </button>
 
-            {/* Divider */}
             <div className="flex items-center my-4">
               <div className="flex-1 h-px bg-gray-700"></div>
               <span className="px-3 text-gray-400 text-sm">OR</span>
               <div className="flex-1 h-px bg-gray-700"></div>
             </div>
 
-            {/* Email Input */}
             <input
               type="email"
               placeholder="Enter your email"
@@ -128,9 +136,10 @@ export default function Home() {
 
             <button
               onClick={handleEmailLogin}
-              className="w-full bg-green-600 hover:bg-green-700 py-3 rounded-xl font-semibold transition"
+              disabled={authLoading}
+              className="w-full bg-green-600 hover:bg-green-700 py-3 rounded-xl font-semibold transition disabled:opacity-50"
             >
-              Send OTP
+              {authLoading ? "Sending..." : "Send OTP"}
             </button>
 
             <button
@@ -144,7 +153,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* LOADING OVERLAY */}
       {loading && (
         <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50">
           <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-500 mb-6"></div>

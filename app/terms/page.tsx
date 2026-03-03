@@ -29,8 +29,7 @@ export default function Terms() {
 
         <h2 className="text-2xl font-semibold mt-6">Limitation of Liability</h2>
         <p className="text-gray-300">
-          We are not responsible for any business losses, incorrect pricing,
-          tax miscalculations, or damages resulting from use of this platform.
+         LayerLedger shall not be liable for any indirect, incidental, or consequential damages arising from use of the platform.
         </p>
 
         <h2 className="text-2xl font-semibold mt-6">Changes</h2>
