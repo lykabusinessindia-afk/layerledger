@@ -146,8 +146,11 @@ const profitAmount =
   <span className="text-green-400 ml-1">Ledger</span>
 </h1>
 
-          <p className="text-gray-400 mt-4 text-lg font-medium tracking-wide">
-  Turn Every 3D Print Into Predictable Profit
+          <p className="text-xl md:text-2xl text-gray-300 text-center max-w-2xl mb-12 leading-relaxed">
+  Turn Every 3D Print Into{" "}
+  <span className="text-green-500 font-semibold">
+    Predictable Profit
+  </span>
 </p>
 
           <button
