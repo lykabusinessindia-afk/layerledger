@@ -5,14 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function Calculator() {
   const router = useRouter();
-
   const [checkingAuth, setCheckingAuth] = useState(true);
-
-  const [waitlistEmail, setWaitlistEmail] = useState("");
-  const [joining, setJoining] = useState(false);
-
-  const [feedback, setFeedback] = useState("");
-  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   const [filamentUsed, setFilamentUsed] = useState(0);
   const [filamentPricePerKg, setFilamentPricePerKg] = useState(0);
@@ -43,89 +36,24 @@ export default function Calculator() {
     router.push("/");
   };
 
-  const handleWaitlist = async () => {
-    if (!waitlistEmail) {
-      alert("Please enter your email");
-      return;
-    }
-
-    try {
-      setJoining(true);
-      const { error } = await supabase
-        .from("waitlist")
-        .insert([{ email: waitlistEmail.toLowerCase() }]);
-
-      if (error) {
-        alert(error.message);
-        setJoining(false);
-        return;
-      }
-
-      alert("You're on the waitlist 🚀");
-      setWaitlistEmail("");
-      setJoining(false);
-    } catch {
-      alert("Unexpected error occurred.");
-      setJoining(false);
-    }
-  };
-
-  const handleFeedbackSubmit = async () => {
-    if (!feedback) {
-      alert("Please enter your feedback");
-      return;
-    }
-
-    try {
-      setSubmittingFeedback(true);
-      const { error } = await supabase
-        .from("feedback")
-        .insert([{ message: feedback }]);
-
-      if (error) {
-        alert(error.message);
-        setSubmittingFeedback(false);
-        return;
-      }
-
-      alert("Thank you for your feedback 🙌");
-      setFeedback("");
-      setSubmittingFeedback(false);
-    } catch {
-      alert("Unexpected error occurred.");
-      setSubmittingFeedback(false);
-    }
-  };
-
   const filamentCost = (filamentUsed / 1000) * filamentPricePerKg;
-
   const electricityCost =
     (machinePowerWatts / 1000) * printTimeHours * electricityRate;
-
   const machineCost = machineCostPerHour * printTimeHours;
 
   const totalCost =
-  filamentCost +
-  electricityCost +
-  packagingCost +
-  shippingCost +
-  machineCost;
+    filamentCost +
+    electricityCost +
+    packagingCost +
+    shippingCost +
+    machineCost;
 
-//Add failure adjustment
-const adjustedCost =
-  totalCost * (1 + failureRate / 100);
-
-const baseSellingPrice =
-  adjustedCost + (adjustedCost * profitMargin) / 100;
-
-const gstAmount =
-  (baseSellingPrice * gstPercent) / 100;
-
-const sellingPrice =
-  baseSellingPrice + gstAmount;
-
-const profitAmount =
-  baseSellingPrice - adjustedCost;
+  const adjustedCost = totalCost * (1 + failureRate / 100);
+  const baseSellingPrice =
+    adjustedCost + (adjustedCost * profitMargin) / 100;
+  const gstAmount = (baseSellingPrice * gstPercent) / 100;
+  const sellingPrice = baseSellingPrice + gstAmount;
+  const profitAmount = baseSellingPrice - adjustedCost;
 
   if (checkingAuth) {
     return (
@@ -140,93 +68,87 @@ const profitAmount =
       <div className="max-w-4xl mx-auto">
 
         {/* HEADER */}
-        <div className="relative mb-12 text-center">
-          <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight">
-  <span className="text-white">Layer</span>
-  <span className="text-green-400 ml-1">Ledger</span>
-</h1>
+        <div className="mb-12">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start items-center gap-6">
 
-          <p className="text-xl md:text-2xl text-gray-300 text-center max-w-2xl mb-12 leading-relaxed">
-  Turn Every 3D Print Into{" "}
-  <span className="text-green-500 font-semibold">
-    Predictable Profit
-  </span>
-</p>
+            <div className="text-center md:text-left">
+              <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight">
+                <span className="text-white">Layer</span>
+                <span className="text-green-400 ml-1">Ledger</span>
+              </h1>
 
-          <button
-            onClick={handleSignOut}
-            className="absolute right-0 top-0 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-semibold"
-          >
-            Sign Out
-          </button>
+              <p className="text-lg md:text-2xl text-gray-300 mt-4 max-w-2xl">
+                Turn Every 3D Print Into{" "}
+                <span className="text-green-500 font-semibold">
+                  Predictable Profit
+                </span>
+              </p>
+            </div>
+
+            <button
+              onClick={handleSignOut}
+              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-semibold"
+            >
+              Sign Out
+            </button>
+
+          </div>
         </div>
 
         {/* INPUTS */}
-<div className="flex flex-col gap-4 max-w-xl mx-auto">
+        <div className="flex flex-col gap-4 max-w-xl mx-auto">
+          <input type="number" placeholder="Filament Used (grams)"
+            className="p-3 rounded bg-gray-800"
+            onChange={(e)=>setFilamentUsed(Number(e.target.value))}
+          />
+          <input type="number" placeholder="Filament Price per KG"
+            className="p-3 rounded bg-gray-800"
+            onChange={(e)=>setFilamentPricePerKg(Number(e.target.value))}
+          />
+          <input type="number" placeholder="Print Time (hours)"
+            className="p-3 rounded bg-gray-800"
+            onChange={(e)=>setPrintTimeHours(Number(e.target.value))}
+          />
+          <input type="number" placeholder="Electricity Rate (per kWh)"
+            className="p-3 rounded bg-gray-800"
+            onChange={(e)=>setElectricityRate(Number(e.target.value))}
+          />
+          <input type="number" placeholder="Machine Power (Watts)"
+            className="p-3 rounded bg-gray-800"
+            onChange={(e)=>setMachinePowerWatts(Number(e.target.value))}
+          />
+          <input type="number" placeholder="Machine Cost Per Hour"
+            className="p-3 rounded bg-gray-800"
+            onChange={(e)=>setMachineCostPerHour(Number(e.target.value))}
+          />
+          <input type="number" placeholder="Packaging Cost"
+            className="p-3 rounded bg-gray-800"
+            onChange={(e)=>setPackagingCost(Number(e.target.value))}
+          />
+          <input type="number" placeholder="Shipping Cost"
+            className="p-3 rounded bg-gray-800"
+            onChange={(e)=>setShippingCost(Number(e.target.value))}
+          />
+          <input type="number"
+            placeholder="Failure Rate %"
+            value={failureRate}
+            className="p-3 rounded bg-gray-800"
+            onChange={(e)=>setFailureRate(Number(e.target.value))}
+          />
+          <input type="number"
+            placeholder="Profit Margin %"
+            value={profitMargin}
+            className="p-3 rounded bg-gray-800"
+            onChange={(e)=>setProfitMargin(Number(e.target.value))}
+          />
+          <input type="number"
+            placeholder="GST %"
+            className="p-3 rounded bg-gray-800"
+            onChange={(e)=>setGstPercent(Number(e.target.value))}
+          />
+        </div>
 
-  <input type="number" placeholder="Filament Used (grams)"
-    className="p-3 rounded bg-gray-800"
-    onChange={(e)=>setFilamentUsed(Number(e.target.value))}
-  />
-
-  <input type="number" placeholder="Filament Price per KG"
-    className="p-3 rounded bg-gray-800"
-    onChange={(e)=>setFilamentPricePerKg(Number(e.target.value))}
-  />
-
-  <input type="number" placeholder="Print Time (hours)"
-    className="p-3 rounded bg-gray-800"
-    onChange={(e)=>setPrintTimeHours(Number(e.target.value))}
-  />
-
-  <input type="number" placeholder="Electricity Rate (per kWh)"
-    className="p-3 rounded bg-gray-800"
-    onChange={(e)=>setElectricityRate(Number(e.target.value))}
-  />
-
-  <input type="number" placeholder="Machine Power (Watts)"
-    className="p-3 rounded bg-gray-800"
-    onChange={(e)=>setMachinePowerWatts(Number(e.target.value))}
-  />
-
-  <input type="number" placeholder="Machine Cost Per Hour"
-    className="p-3 rounded bg-gray-800"
-    onChange={(e)=>setMachineCostPerHour(Number(e.target.value))}
-  />
-
-  <input type="number" placeholder="Packaging Cost"
-    className="p-3 rounded bg-gray-800"
-    onChange={(e)=>setPackagingCost(Number(e.target.value))}
-  />
-
-  <input type="number" placeholder="Shipping Cost"
-    className="p-3 rounded bg-gray-800"
-    onChange={(e)=>setShippingCost(Number(e.target.value))}
-  />
-
-  <input type="number"
-    placeholder="Failure Rate % (Recommended 5-10%)"
-    value={failureRate}
-    className="p-3 rounded bg-gray-800"
-    onChange={(e)=>setFailureRate(Number(e.target.value))}
-  />
-
-  <input type="number"
-    placeholder="Profit Margin %"
-    value={profitMargin}
-    className="p-3 rounded bg-gray-800"
-    onChange={(e)=>setProfitMargin(Number(e.target.value))}
-  />
-
-  <input type="number"
-    placeholder="GST %"
-    className="p-3 rounded bg-gray-800"
-    onChange={(e)=>setGstPercent(Number(e.target.value))}
-  />
-
-</div>
-
-        {/* COST BREAKDOWN */}
+        {/* RESULTS */}
         <div className="mt-14 bg-gray-900 p-6 rounded-xl max-w-xl mx-auto shadow-lg">
           <h2 className="text-xl font-semibold mb-4">Cost Breakdown</h2>
 
@@ -257,77 +179,7 @@ const profitAmount =
               <span>Final Selling Price (Incl. GST)</span>
               <span>₹ {sellingPrice.toFixed(2)}</span>
             </div>
-            <button
-  onClick={() => {
-    navigator.clipboard.writeText(
-      `Final Selling Price (Incl. GST): ₹${sellingPrice.toFixed(2)}`
-    );
-    alert("Price copied 🚀");
-  }}
-  className="w-full mt-4 bg-green-600 hover:bg-green-700 p-3 rounded-lg font-bold"
->
-  Copy Final Selling Price
-</button>
           </div>
-        </div>
-
-        {/* WAITLIST */}
-        <div className="mt-16 p-8 bg-gray-900 rounded-xl border border-gray-700 max-w-2xl mx-auto shadow-lg">
-          <h2 className="text-2xl font-bold text-green-400 mb-4">
-            🔥 LayerLedger Pro – Coming Soon
-          </h2>
-
-          <p className="text-gray-400 mb-6">
-            Advanced tools built for serious 3D printing sellers.
-          </p>
-
-          <ul className="space-y-3 text-gray-300 mb-8">
-            <li>🚀 STL File Upload with Auto Cost Detection</li>
-            <li>📦 Bulk Order Pricing Calculator</li>
-            <li>📊 Monthly Profit & Revenue Dashboard</li>
-            <li>💰 Filament Inventory & Cost Tracker</li>
-            <li>🧾 GST Invoice Generator (PDF Export)</li>
-            <li>🛒 Shopify Price Sync Integration</li>
-            <li>📁 Save & Export Project History</li>
-          </ul>
-
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={waitlistEmail}
-            onChange={(e) => setWaitlistEmail(e.target.value)}
-            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white"
-          />
-
-          <button
-            onClick={handleWaitlist}
-            disabled={joining}
-            className="mt-4 w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg font-semibold disabled:opacity-50"
-          >
-            {joining ? "Joining..." : "Join Waitlist"}
-          </button>
-        </div>
-
-        {/* FEEDBACK */}
-        <div className="mt-12 p-6 bg-gray-900 rounded-xl border border-gray-700 max-w-xl mx-auto">
-          <h3 className="text-lg font-semibold text-green-400 mb-3">
-            💬 Share Your Feedback
-          </h3>
-
-          <textarea
-            placeholder="Share your feedback..."
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white min-h-[100px]"
-          />
-
-          <button
-            onClick={handleFeedbackSubmit}
-            disabled={submittingFeedback}
-            className="mt-4 w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg font-semibold disabled:opacity-50"
-          >
-            {submittingFeedback ? "Submitting..." : "Submit Feedback"}
-          </button>
         </div>
 
       </div>
