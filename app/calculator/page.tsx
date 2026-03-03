@@ -147,7 +147,7 @@ const profitAmount =
 </h1>
 
           <p className="text-gray-400 mt-4 text-lg font-medium tracking-wide">
-  Turn Your 3D Prints Into Profitable Products
+  Turn Every 3D Print Into Predictable Profit
 </p>
 
           <button
