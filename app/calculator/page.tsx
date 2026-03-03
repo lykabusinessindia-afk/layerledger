@@ -176,6 +176,15 @@ export default function Calculator() {
           <p className="text-gray-400 mb-4">
             Advanced tools built for serious 3D printing sellers.
           </p>
+          <ul className="space-y-3 text-gray-300 mb-8 mt-6 text-sm md:text-base">
+  <li>🚀 STL File Upload with Auto Cost Detection</li>
+  <li>📦 Bulk Order Pricing Calculator</li>
+  <li>📊 Monthly Profit & Revenue Dashboard</li>
+  <li>💰 Filament Inventory & Cost Tracker</li>
+  <li>🧾 GST Invoice Generator (PDF Export)</li>
+  <li>🛒 Shopify Price Sync Integration</li>
+  <li>📁 Save & Export Project History</li>
+</ul>
           <input type="email" placeholder="Enter your email" value={waitlistEmail} onChange={(e)=>setWaitlistEmail(e.target.value)} className="w-full p-3 rounded bg-gray-800"/>
           <button onClick={handleWaitlist} className="mt-4 w-full bg-green-600 p-3 rounded-lg">
             {joining ? "Joining..." : "Join Waitlist"}
