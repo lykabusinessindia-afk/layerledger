@@ -132,8 +132,7 @@ const handleInstall = async () => {
       >
         Launch Calculator
       </button>
-      {installPrompt && (
-<button
+      <button
 onClick={handleInstall}
 style={{
   backgroundColor: "#16a34a",
@@ -149,7 +148,6 @@ style={{
 >
 Install LayerLedger
 </button>
-)}
       <p className="text-center text-sm text-gray-400 mt-6">
 Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</a>
 </p>
