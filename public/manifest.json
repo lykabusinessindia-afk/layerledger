@@ -1,11 +1,11 @@
 {
   "name": "LayerLedger",
   "short_name": "LayerLedger",
-  "description": "3D Printing Cost Calculator",
+  "description": "3D Printing Profit Calculator",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
-  "theme_color": "#22c55e",
+  "theme_color": "#4ade80",
   "orientation": "portrait",
   "icons": [
     {
