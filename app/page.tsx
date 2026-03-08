@@ -88,9 +88,7 @@ export default function Home() {
         <br />
         Know your real cost. Price with confidence.
       </p>
-      <p className="text-center text-sm text-gray-400 mt-2">
-Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</a>
-</p>
+      
 
       <button
         onClick={async () => {
@@ -106,6 +104,9 @@ Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</
       >
         Launch Calculator
       </button>
+      <p className="text-center text-sm text-gray-400 mt-2">
+Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</a>
+</p>
 
       {showLogin && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
