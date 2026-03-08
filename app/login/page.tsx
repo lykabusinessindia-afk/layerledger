@@ -72,7 +72,7 @@ export default function Login() {
           LayerLedger
         </h1>
         <p className="text-center text-sm text-gray-400 mt-2">
-Built by <a href="https://lyka3dstudio.com" className="underline">LYKA 3D Studio</a>
+Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</a>
 </p>
 
         <input
