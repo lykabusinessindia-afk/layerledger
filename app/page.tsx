@@ -76,6 +76,7 @@ export default function Home() {
     }
   };
 
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white flex flex-col items-center justify-center px-6 relative">
 
@@ -107,6 +108,22 @@ export default function Home() {
       <p className="text-center text-sm text-gray-400 mt-6">
 Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</a>
 </p>
+<button
+  id="installBtn"
+  style={{
+  backgroundColor: "#22c55e",
+  color: "white",
+  padding: "10px 18px",
+  borderRadius: "8px",
+  border: "none",
+  cursor: "pointer",
+  marginTop: "12px",
+  fontWeight: "600",
+  display: "none"
+}}
+>
+📲 Install LayerLedger
+</button>
 
       {showLogin && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
