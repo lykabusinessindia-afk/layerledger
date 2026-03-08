@@ -134,17 +134,7 @@ const handleInstall = async () => {
       </button>
       <button
 onClick={handleInstall}
-style={{
-  backgroundColor: "#16a34a",
-  color: "white",
-  padding: "10px 18px",
-  borderRadius: "8px",
-  border: "none",
-  cursor: "pointer",
-  marginTop: "12px",
-  fontWeight: "600",
-  transition: "0.2s"
-}}
+className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg mt-3 font-semibold transition-all duration-300"
 >
 Install LayerLedger
 </button>
