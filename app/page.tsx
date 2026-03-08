@@ -5,6 +5,33 @@ import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+useEffect(() => {
+  const handler = (e: any) => {
+    e.preventDefault();
+    setInstallPrompt(e);
+  };
+
+  window.addEventListener("beforeinstallprompt", handler);
+
+  return () => {
+    window.removeEventListener("beforeinstallprompt", handler);
+  };
+}, []);
+
+const handleInstall = async () => {
+  if (!installPrompt) return;
+
+  installPrompt.prompt();
+  const { outcome } = await installPrompt.userChoice;
+
+  if (outcome === "accepted") {
+    console.log("App installed");
+  }
+
+  setInstallPrompt(null);
+};
   const router = useRouter();
 
   const [showLogin, setShowLogin] = useState(false);
@@ -109,20 +136,19 @@ export default function Home() {
 Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</a>
 </p>
 <button
-  id="installBtn"
-  style={{
-  backgroundColor: "#22c55e",
+onClick={handleInstall}
+style={{
+  backgroundColor: "#16a34a",
   color: "white",
   padding: "10px 18px",
   borderRadius: "8px",
   border: "none",
   cursor: "pointer",
   marginTop: "12px",
-  fontWeight: "600",
-  display: "none"
+  fontWeight: "600"
 }}
 >
-📲 Install LayerLedger
+Install LayerLedger
 </button>
 
       {showLogin && (
