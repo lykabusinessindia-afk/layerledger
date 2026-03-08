@@ -71,6 +71,9 @@ export default function Login() {
         <h1 className="text-3xl font-bold text-center">
           LayerLedger
         </h1>
+        <p className="text-center text-sm text-gray-400 mt-2">
+Built by <a href="https://lyka3dstudio.com" className="underline">LYKA 3D Studio</a>
+</p>
 
         <input
           type="email"
