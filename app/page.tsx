@@ -104,7 +104,7 @@ export default function Home() {
       >
         Launch Calculator
       </button>
-      <p className="text-center text-sm text-gray-400 mt-2">
+      <p className="text-center text-sm text-gray-400 mt-6">
 Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</a>
 </p>
 
