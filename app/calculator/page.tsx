@@ -111,6 +111,9 @@ export default function Calculator() {
                 Predictable Profit
               </span>
             </p>
+            <p className="text-center text-sm text-gray-400 mt-2">
+Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</a>
+</p>
 
             <div className="mt-6 md:hidden">
               <button
