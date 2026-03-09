@@ -132,7 +132,7 @@ export default function Calculator() {
       <div className="max-w-4xl mx-auto">
 
         {/* HEADER */}
-        <div className="flex justify-end gap-3 mb-6">
+        <div className="hidden md:flex justify-end gap-3 mb-6">
 
           <button
             onClick={handleInstall}
