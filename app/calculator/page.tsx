@@ -24,6 +24,18 @@ const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [failureRate, setFailureRate] = useState(5);
   const [gstPercent, setGstPercent] = useState(0);
   const [profitMargin, setProfitMargin] = useState(30);
+  useEffect(() => {
+  const handler = (e) => {
+    e.preventDefault();
+    setInstallPrompt(e);
+  };
+
+  window.addEventListener("beforeinstallprompt", handler);
+
+  return () => {
+    window.removeEventListener("beforeinstallprompt", handler);
+  };
+}, []);
 
   useEffect(() => {
     const checkUser = async () => {
