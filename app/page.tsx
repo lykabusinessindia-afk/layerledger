@@ -132,14 +132,12 @@ const handleInstall = async () => {
       >
         Launch Calculator
       </button>
-      {installPrompt && (
-<button
+      <button
 onClick={handleInstall}
 className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg mt-3 font-semibold transition-all duration-300"
 >
 Install LayerLedger
 </button>
-)}
       <p className="text-center text-sm text-gray-400 mt-6">
 Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</a>
 </p>
