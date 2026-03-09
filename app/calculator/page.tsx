@@ -6,7 +6,8 @@ import { supabase } from "@/lib/supabase";
 export default function Calculator() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
-
+  
+const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const [joining, setJoining] = useState(false);
 
@@ -24,7 +25,19 @@ export default function Calculator() {
   const [failureRate, setFailureRate] = useState(5);
   const [gstPercent, setGstPercent] = useState(0);
   const [profitMargin, setProfitMargin] = useState(30);
+const handleInstall = async () => {
+  if (!installPrompt) return;
 
+  installPrompt.prompt();
+
+  const { outcome } = await installPrompt.userChoice;
+
+  if (outcome === "accepted") {
+    console.log("App installed");
+  }
+
+  setInstallPrompt(null);
+};
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
@@ -75,7 +88,16 @@ export default function Calculator() {
   const gstAmount = (baseSellingPrice * gstPercent) / 100;
   const sellingPrice = baseSellingPrice + gstAmount;
   const profitAmount = baseSellingPrice - adjustedCost;
+useEffect(() => {
+  const handler = (e) => {
+    e.preventDefault();
+    setInstallPrompt(e);
+  };
 
+  window.addEventListener("beforeinstallprompt", handler);
+
+  return () => window.removeEventListener("beforeinstallprompt", handler);
+}, []);
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
@@ -89,16 +111,25 @@ export default function Calculator() {
       <div className="max-w-4xl mx-auto">
 
         {/* HEADER */}
-        <div className="relative mb-12">
-          <div className="hidden md:block absolute right-0 top-0">
-            <button
-              onClick={handleSignOut}
-              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-semibold"
-            >
-              Sign Out
-            </button>
-          </div>
+       <div className="hidden md:flex absolute right-0 top-0 gap-3">
 
+{installPrompt && (
+  <button
+    onClick={handleInstall}
+    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition"
+  >
+    ↓ Install
+  </button>
+)}
+
+<button
+  onClick={handleSignOut}
+  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition"
+>
+  Sign Out
+</button>
+
+</div>
           <div className="text-center">
             <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight">
               <span>Layer</span>
@@ -206,7 +237,5 @@ Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</
         </div>
 
       </div>
-      
-    </div>
   );
 }
