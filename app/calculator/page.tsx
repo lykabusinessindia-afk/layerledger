@@ -101,23 +101,21 @@ const handleInstall = async () => {
       <div className="max-w-4xl mx-auto">
 
         {/* HEADER */}
-       <div className="flex justify-end gap-3 mb-6">
-{installPrompt && (
-<button
-onClick={handleInstall}
-className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition"
->
-⬇ Install
-</button>
-)}
+<div className="flex justify-end gap-3 mb-6">
 
-<button
-onClick={handleSignOut}
-className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition"
->
-Sign Out
+  <button
+    onClick={handleInstall}
+    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-200 shadow-lg hover:scale-105 hover:shadow-green-500/40"
+  >
+    ⬇ Install App
+  </button>
 
-</button>
+  <button
+    onClick={handleSignOut}
+    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-200 shadow-lg hover:scale-105"
+  >
+    Sign Out
+  </button>
 
 </div>
           <div className="text-center">
