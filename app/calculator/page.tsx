@@ -101,8 +101,7 @@ const handleInstall = async () => {
       <div className="max-w-4xl mx-auto">
 
         {/* HEADER */}
-       <div className="hidden md:flex absolute right-0 top-0 gap-3">
-
+       <div className="flex justify-end gap-3 mb-6">
 {installPrompt && (
 <button
 onClick={handleInstall}
