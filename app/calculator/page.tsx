@@ -6,7 +6,6 @@ import { supabase } from "@/lib/supabase";
 export default function Calculator() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
-  
 const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const [joining, setJoining] = useState(false);
@@ -25,19 +24,7 @@ const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [failureRate, setFailureRate] = useState(5);
   const [gstPercent, setGstPercent] = useState(0);
   const [profitMargin, setProfitMargin] = useState(30);
-const handleInstall = async () => {
-  if (!installPrompt) return;
 
-  installPrompt.prompt();
-
-  const { outcome } = await installPrompt.userChoice;
-
-  if (outcome === "accepted") {
-    console.log("App installed");
-  }
-
-  setInstallPrompt(null);
-};
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
@@ -88,16 +75,19 @@ const handleInstall = async () => {
   const gstAmount = (baseSellingPrice * gstPercent) / 100;
   const sellingPrice = baseSellingPrice + gstAmount;
   const profitAmount = baseSellingPrice - adjustedCost;
-useEffect(() => {
-  const handler = (e) => {
-    e.preventDefault();
-    setInstallPrompt(e);
-  };
+const handleInstall = async () => {
+  if (!installPrompt) return;
 
-  window.addEventListener("beforeinstallprompt", handler);
+  installPrompt.prompt();
 
-  return () => window.removeEventListener("beforeinstallprompt", handler);
-}, []);
+  const { outcome } = await installPrompt.userChoice;
+
+  if (outcome === "accepted") {
+    console.log("App installed");
+  }
+
+  setInstallPrompt(null);
+};
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
@@ -114,19 +104,20 @@ useEffect(() => {
        <div className="hidden md:flex absolute right-0 top-0 gap-3">
 
 {installPrompt && (
-  <button
-    onClick={handleInstall}
-    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition"
-  >
-    ↓ Install
-  </button>
+<button
+onClick={handleInstall}
+className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition"
+>
+⬇ Install
+</button>
 )}
 
 <button
-  onClick={handleSignOut}
-  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition"
+onClick={handleSignOut}
+className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition"
 >
-  Sign Out
+Sign Out
+
 </button>
 
 </div>
