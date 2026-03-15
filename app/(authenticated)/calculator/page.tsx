@@ -86,12 +86,8 @@ const PRINTER_PROFILES: Record<string, PrinterProfile> = {
   "Elegoo OrangeStorm Giga": { power: 600, speed: 250, machineCostPerHour: 40 },
 };
 
-// Slicer-style filament estimation constants
-const WALLS_FACTOR = 0.35;          // shell / perimeter volume fraction
-const DEFAULT_INFILL_PERCENTAGE = 0.22; // default infill (22 %)
-const TOP_BOTTOM_FACTOR = 0.15;     // top and bottom solid layers
-const SUPPORTS_FACTOR = 0.05;       // estimated support material
-const SLICER_EFFICIENCY_FACTOR = 0.65; // extrusion path efficiency vs raw volume
+// Effective volume fraction — empirically tuned to match slicer outputs (walls + infill + top/bottom + supports)
+const EFFECTIVE_VOLUME_FACTOR = 0.43;
 
 type MaterialType = "PLA" | "PETG" | "ABS" | "TPU" | "ASA" | "PLA+";
 
@@ -308,22 +304,14 @@ export default function Calculator() {
       return;
     }
 
-    const infillPercentage = DEFAULT_INFILL_PERCENTAGE;
     const materialDensity = MATERIAL_LIBRARY[materialType]?.density ?? 1.24;
 
-    const wallsVolume    = modelVolume * WALLS_FACTOR;
-    const infillVolume   = modelVolume * infillPercentage;
-    const topBotVolume   = modelVolume * TOP_BOTTOM_FACTOR;
-    const supportsVolume = modelVolume * SUPPORTS_FACTOR;
+    const effectiveVolume = modelVolume * EFFECTIVE_VOLUME_FACTOR;
+    const filamentWeight  = Math.round(effectiveVolume * materialDensity * 100) / 100;
 
-    const bodyVolume = wallsVolume + infillVolume + topBotVolume;
-    const effectiveVolume = bodyVolume + supportsVolume;
-
-    const rawFilamentWeight = effectiveVolume * materialDensity;
-    const filamentWeight    = Math.round(rawFilamentWeight * SLICER_EFFICIENCY_FACTOR * 100) / 100;
-
-    const modelGrams   = Math.round(bodyVolume   * materialDensity * SLICER_EFFICIENCY_FACTOR * 100) / 100;
-    const supportGrams = Math.round(supportsVolume * materialDensity * SLICER_EFFICIENCY_FACTOR * 100) / 100;
+    // Approximate split: ~90% body, ~10% supports
+    const modelGrams   = Math.round(filamentWeight * 0.90 * 100) / 100;
+    const supportGrams = Math.round(filamentWeight * 0.10 * 100) / 100;
 
     setModelFilamentUsed(modelGrams);
     setSupportFilamentUsed(supportGrams);
