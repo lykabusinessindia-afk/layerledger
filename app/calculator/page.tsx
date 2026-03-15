@@ -40,6 +40,8 @@ export default function Calculator() {
     depth: 0,
     height: 0,
   });
+  const [ownershipConfirmed, setOwnershipConfirmed] = useState(false);
+  const [showOwnershipWarning, setShowOwnershipWarning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parseNumber = (value: string) => {
@@ -53,6 +55,11 @@ export default function Calculator() {
   };
 
   const handleUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    if (!ownershipConfirmed) {
+      setShowOwnershipWarning(true);
+      return;
+    }
+
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -62,10 +69,16 @@ export default function Calculator() {
     }
 
     setModelFile(file);
+    setShowOwnershipWarning(false);
   };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+
+    if (!ownershipConfirmed) {
+      setShowOwnershipWarning(true);
+      return;
+    }
 
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
@@ -76,6 +89,7 @@ export default function Calculator() {
     }
 
     setModelFile(file);
+    setShowOwnershipWarning(false);
   };
 
   const handleClearModel = () => {
@@ -350,16 +364,47 @@ export default function Calculator() {
           />
         </div>
 
+        {/* OWNERSHIP CONFIRMATION */}
+        <div className="mt-8 max-w-xl mx-auto">
+          <label className="flex items-start gap-3 text-sm text-gray-300">
+            <input
+              type="checkbox"
+              checked={ownershipConfirmed}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setOwnershipConfirmed(checked);
+                if (checked) {
+                  setShowOwnershipWarning(false);
+                }
+              }}
+              className="mt-0.5 h-4 w-4 accent-green-500"
+            />
+            <span>I confirm that I own this model or have permission to print it.</span>
+          </label>
+          {showOwnershipWarning && (
+            <p className="mt-2 text-xs text-red-400">
+              Please confirm model ownership before uploading.
+            </p>
+          )}
+        </div>
+
         {/* STL UPLOAD */}
         <div className="mt-8 max-w-xl mx-auto">
           <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
+            onClick={() => {
+              if (!ownershipConfirmed) {
+                setShowOwnershipWarning(true);
+              }
+            }}
             style={{
               border: "2px dashed #00ff88",
               padding: "40px",
               borderRadius: "12px",
-              textAlign: "center"
+              textAlign: "center",
+              opacity: ownershipConfirmed ? 1 : 0.6,
+              cursor: ownershipConfirmed ? "pointer" : "not-allowed"
             }}
           >
             <p>Drag & Drop STL, OBJ, or 3MF file here</p>
@@ -368,6 +413,7 @@ export default function Calculator() {
               type="file"
               accept=".stl,.obj,.3mf"
               onChange={handleUpload}
+              disabled={!ownershipConfirmed}
             />
             <button
               onClick={handleClearModel}
