@@ -1,19 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { useInstallPrompt } from "@/lib/useInstallPrompt";
 
 export default function HomePageClient() {
-  const { promptInstall } = useInstallPrompt();
-
-  const handleInstall = async () => {
-    const accepted = await promptInstall();
-    if (accepted) console.log("App installed");
-  };
-
   const router = useRouter();
 
   const [showLogin, setShowLogin] = useState(false);
@@ -80,173 +73,210 @@ export default function HomePageClient() {
     }
   };
 
+  const handleLaunchCalculator = async () => {
+    const { data } = await supabase.auth.getSession();
+
+    if (data.session) {
+      router.push("/calculator");
+    } else {
+      setShowLogin(true);
+    }
+  };
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white px-6 py-16 relative">
-      <section className="max-w-6xl mx-auto flex flex-col items-center text-center">
-        <h1 className="text-6xl md:text-7xl font-extrabold mb-6 tracking-tight">
-          Layer<span className="text-green-500">Ledger</span>
-        </h1>
+    <main className="min-h-screen overflow-x-hidden bg-[#07111f] text-white relative">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.18),_transparent_30%),radial-gradient(circle_at_80%_20%,_rgba(59,130,246,0.12),_transparent_22%)] pointer-events-none" />
+      <div className="absolute inset-0 opacity-[0.08] pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.18)_1px,transparent_1px)] bg-[size:36px_36px]" />
 
-        <p className="text-xl md:text-2xl text-gray-300 text-center max-w-2xl mb-12 leading-relaxed">
-          The Simplest Way to Price Your 3D Prints Profitably.
-          <br />
-          Know your real cost. Price with confidence.
-        </p>
+      <section className="relative px-6 pt-20 pb-16 md:pt-28 md:pb-24">
+        <div className="max-w-6xl mx-auto text-center">
+          <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.25em] text-green-300 shadow-lg shadow-black/20">
+            3D Printing Pricing, Simplified
+          </div>
 
-        <button
-          onClick={async () => {
-            const { data } = await supabase.auth.getSession();
+          <h1 className="mt-8 text-6xl md:text-8xl font-black tracking-tight leading-none">
+            LayerLedger
+          </h1>
 
-            if (data.session) {
-              router.push("/calculator");
-            } else {
-              setShowLogin(true);
-            }
-          }}
-          className="bg-green-600 hover:bg-green-700 transition-all duration-300 px-10 py-4 rounded-xl"
-        >
-          Launch Calculator
-        </button>
-        <button
-          onClick={handleInstall}
-          className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg mt-3 font-semibold transition-all duration-300"
-        >
-          Install LayerLedger
-        </button>
-        <p className="text-center text-sm text-gray-400 mt-6">
-          Built by <a href="https://lyka3dstudio.com" className="underline">LYKA3DStudio</a>
-        </p>
-      </section>
-
-      <section className="max-w-6xl mx-auto mt-20">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Features</h2>
-          <p className="text-gray-400 mt-3 max-w-2xl mx-auto">
-            Everything you need to evaluate a print job, validate printer fit, and quote with confidence.
+          <p className="mt-6 text-2xl md:text-4xl font-semibold text-white/90 max-w-4xl mx-auto leading-tight">
+            Turn Every 3D Print Into Predictable Profit
           </p>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {[
-            {
-              title: "Upload 3D Models",
-              description: "Supports STL, OBJ, and 3MF file uploads.",
-            },
-            {
-              title: "Automatic Model Analysis",
-              description: "Instantly calculates volume, filament usage, dimensions, and estimated print time.",
-            },
-            {
-              title: "Printer Compatibility Check",
-              description: "Verify if the model fits common 3D printers like Ender 3, Bambu Lab, Prusa, and others.",
-            },
-            {
-              title: "Build Plate Preview",
-              description: "View the model on a virtual build plate with grid and XYZ axes.",
-            },
-            {
-              title: "Instant Price Quote",
-              description: "Automatically estimate printing cost based on material, electricity, machine time, and other inputs.",
-            },
-          ].map((feature) => (
-            <div
-              key={feature.title}
-              className="rounded-2xl border border-gray-800 bg-gray-950/70 p-6 shadow-lg shadow-black/20"
-            >
-              <h3 className="text-xl font-semibold text-white">{feature.title}</h3>
-              <p className="text-gray-400 mt-3 leading-relaxed">{feature.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="max-w-6xl mx-auto mt-20">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">How LayerLedger Works</h2>
-          <p className="text-gray-400 mt-3 max-w-2xl mx-auto">
-            Upload a model, let LayerLedger analyze it, and get a usable print quote in seconds.
+          <p className="mt-6 text-base md:text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed">
+            LayerLedger analyzes your 3D models, estimates filament, print time, printer fit, and cost breakdowns automatically so you can quote jobs faster and price with confidence.
           </p>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            {
-              step: "Step 1",
-              marker: "01",
-              title: "Upload Model",
-              description: "Drag and drop your STL, OBJ, or 3MF file.",
-            },
-            {
-              step: "Step 2",
-              marker: "02",
-              title: "Automatic Analysis",
-              description: "LayerLedger calculates model volume, filament usage, dimensions, and print time.",
-            },
-            {
-              step: "Step 3",
-              marker: "03",
-              title: "Get Instant Price Quote",
-              description: "See the estimated printing cost based on your printer settings.",
-            },
-          ].map((item) => (
-            <div
-              key={item.step}
-              className="rounded-2xl border border-gray-800 bg-gray-950/70 p-6 shadow-lg shadow-black/20"
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button
+              onClick={handleLaunchCalculator}
+              className="w-full sm:w-auto rounded-2xl bg-gradient-to-r from-green-500 to-emerald-400 px-8 py-4 text-lg font-semibold text-black shadow-[0_12px_40px_rgba(34,197,94,0.28)] transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_16px_50px_rgba(34,197,94,0.34)]"
             >
-              <div className="h-12 w-12 rounded-full bg-green-900/40 border border-green-500/30 text-green-300 flex items-center justify-center font-bold text-sm">
-                {item.marker}
-              </div>
-              <p className="text-xs uppercase tracking-[0.2em] text-green-400 mt-4">{item.step}</p>
-              <h3 className="text-xl font-semibold text-white mt-2">{item.title}</h3>
-              <p className="text-gray-400 mt-3 leading-relaxed">{item.description}</p>
-            </div>
-          ))}
+              Launch Calculator
+            </button>
+            <a
+              href="#how-it-works"
+              className="w-full sm:w-auto rounded-2xl border border-white/12 bg-white/5 px-8 py-4 text-lg font-semibold text-white backdrop-blur-sm transition-all duration-200 hover:bg-white/10 hover:border-white/20"
+            >
+              See How It Works
+            </a>
+          </div>
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto mt-20 text-center">
-        <h2 className="text-3xl md:text-4xl font-bold tracking-tight">See LayerLedger in Action</h2>
-        <p className="text-gray-400 mt-3 max-w-3xl mx-auto leading-relaxed">
-          Upload a 3D model, preview it on a virtual build plate, and instantly analyze print costs with automated volume, filament, and pricing insights.
-        </p>
-
-        <div className="mt-10 max-w-5xl mx-auto rounded-3xl border border-gray-800 bg-gray-950/70 p-4 md:p-6 shadow-2xl shadow-black/30">
-          <Image
-            src="/layerledger-preview.svg"
-            alt="LayerLedger calculator preview showing the 3D viewer and model analysis panel"
-            width={1400}
-            height={860}
-            className="w-full h-auto rounded-2xl border border-gray-800"
-            priority
-          />
-        </div>
-      </section>
-
-      <section className="max-w-4xl mx-auto mt-24 text-center">
-        <div className="rounded-3xl border border-gray-800 bg-gray-950/70 px-6 py-12 md:px-10 shadow-2xl shadow-black/30">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
-            Start Calculating Your 3D Print Costs Today
+      <section className="relative px-6 py-8 md:py-12">
+        <div className="max-w-6xl mx-auto text-center">
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
+            Analyze Your 3D Prints Instantly
           </h2>
-          <p className="text-gray-400 mt-4 max-w-2xl mx-auto leading-relaxed">
-            Upload a model, analyze filament usage and print time, and get an instant price estimate for your next 3D print job.
+          <p className="mt-4 text-slate-300 max-w-3xl mx-auto text-base md:text-lg leading-relaxed">
+            Upload a model, preview it on a virtual build plate, and get instant insight into material usage, machine time, printer compatibility, and price.
+          </p>
+
+          <div className="mt-10 max-w-5xl mx-auto rounded-[32px] border border-white/10 bg-slate-950/80 p-4 md:p-6 shadow-[0_30px_100px_rgba(0,0,0,0.45)] ring-1 ring-green-500/10">
+            <div className="rounded-[24px] overflow-hidden border border-white/8 shadow-[0_0_80px_rgba(34,197,94,0.08)]">
+              <Image
+                src="/layerledger-preview.svg"
+                alt="LayerLedger calculator preview showing the 3D viewer and model analysis panel"
+                width={1400}
+                height={860}
+                className="w-full h-auto"
+                priority
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="relative px-6 py-20 md:py-24">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12 md:mb-14">
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight">Features Built for Modern 3D Print Shops</h2>
+            <p className="text-slate-300 mt-4 max-w-3xl mx-auto text-base md:text-lg leading-relaxed">
+              From geometry analysis to instant quoting, LayerLedger gives you the core tools to price jobs faster and operate with less guesswork.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {[
+              {
+                icon: "3D",
+                title: "Upload STL / OBJ / 3MF",
+                description: "Bring in the most common 3D model formats with drag-and-drop uploads and instant preview.",
+              },
+              {
+                icon: "AI",
+                title: "Automatic Model Analysis",
+                description: "Calculate volume, filament usage, dimensions, support estimates, and print time automatically.",
+              },
+              {
+                icon: "PC",
+                title: "Printer Compatibility Check",
+                description: "Compare model size against real printer build volumes before you commit to a quote.",
+              },
+              {
+                icon: "₹",
+                title: "Instant Price Quote",
+                description: "Combine material, machine, electricity, packaging, and shipping costs into a usable quote instantly.",
+              },
+              {
+                icon: "MM",
+                title: "Multi Model Build Plate",
+                description: "Arrange multiple models on a virtual plate and see the impact on total cost and print time.",
+              },
+              {
+                icon: "GST",
+                title: "GST Cost Breakdown",
+                description: "See production totals, margin, and tax-aware pricing in a clean business-ready breakdown.",
+              },
+            ].map((feature) => (
+              <div
+                key={feature.title}
+                className="group rounded-3xl border border-white/8 bg-slate-950/70 p-6 md:p-7 shadow-[0_18px_60px_rgba(0,0,0,0.28)] transition-all duration-300 hover:-translate-y-1 hover:border-green-500/30 hover:bg-slate-900/80"
+              >
+                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-green-500/25 to-blue-500/20 border border-white/10 text-green-300 flex items-center justify-center font-bold tracking-wide shadow-inner shadow-white/5">
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-semibold text-white mt-5">{feature.title}</h3>
+                <p className="text-slate-300 mt-3 leading-relaxed">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="how-it-works" className="relative px-6 py-20 md:py-24">
+        <div className="max-w-6xl mx-auto text-center">
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight">How It Works</h2>
+          <p className="text-slate-300 mt-4 max-w-3xl mx-auto text-base md:text-lg leading-relaxed">
+            A simple flow designed to move you from model upload to confident pricing in minutes.
+          </p>
+
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                number: "01",
+                title: "Upload your 3D model",
+                description: "Bring in STL, OBJ, or 3MF files and preview them on a virtual printer build plate.",
+              },
+              {
+                number: "02",
+                title: "Analyze geometry and printer fit",
+                description: "LayerLedger evaluates volume, material use, dimensions, build plate compatibility, and print duration.",
+              },
+              {
+                number: "03",
+                title: "Get instant cost and profit estimate",
+                description: "See production cost, quote price, and business margin before sending the job to print.",
+              },
+            ].map((step) => (
+              <div
+                key={step.number}
+                className="rounded-3xl border border-white/8 bg-slate-950/70 p-6 md:p-8 text-left shadow-[0_18px_60px_rgba(0,0,0,0.24)]"
+              >
+                <div className="h-14 w-14 rounded-full bg-green-900/40 border border-green-500/30 text-green-300 flex items-center justify-center font-bold text-sm tracking-[0.2em]">
+                  {step.number}
+                </div>
+                <h3 className="text-xl font-semibold text-white mt-5">{step.title}</h3>
+                <p className="text-slate-300 mt-3 leading-relaxed">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="relative px-6 py-20 md:py-24">
+        <div className="max-w-4xl mx-auto text-center rounded-[32px] border border-white/10 bg-gradient-to-br from-slate-950/90 to-slate-900/90 px-6 py-14 md:px-12 shadow-[0_30px_100px_rgba(0,0,0,0.45)] ring-1 ring-green-500/10">
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
+            Start Pricing Your 3D Prints Today
+          </h2>
+          <p className="text-slate-300 mt-4 max-w-2xl mx-auto text-base md:text-lg leading-relaxed">
+            Upload your model, review the analysis, and generate instant print quotes with a workflow designed for real 3D printing businesses.
           </p>
 
           <button
-            onClick={async () => {
-              const { data } = await supabase.auth.getSession();
-
-              if (data.session) {
-                router.push("/calculator");
-              } else {
-                setShowLogin(true);
-              }
-            }}
-            className="mt-8 bg-green-600 hover:bg-green-700 transition-all duration-300 px-10 py-4 rounded-xl text-lg font-semibold"
+            onClick={handleLaunchCalculator}
+            className="mt-8 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-400 px-10 py-4 text-lg font-semibold text-black shadow-[0_12px_40px_rgba(34,197,94,0.28)] transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_16px_50px_rgba(34,197,94,0.34)]"
           >
-            Launch LayerLedger Calculator
+            Open LayerLedger Calculator
           </button>
         </div>
       </section>
+
+      <footer className="relative px-6 pb-12 pt-4">
+        <div className="max-w-6xl mx-auto border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-400">
+          <div className="flex items-center gap-5">
+            <Link href="/privacy-policy" className="hover:text-white transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-white transition-colors">
+              Terms of Service
+            </Link>
+          </div>
+          <p>
+            Built by <a href="https://lyka3dstudio.com" className="text-slate-300 hover:text-white transition-colors">LYKA3DStudio</a>
+          </p>
+        </div>
+      </footer>
 
       {showLogin && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
