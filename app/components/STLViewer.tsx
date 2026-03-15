@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
@@ -362,6 +362,35 @@ export default function STLViewer({
     onModelFootprintsChangeRef.current = onModelFootprintsChange;
   }, [onModelFootprintsChange]);
 
+  const updateBuildPlate = useCallback((width: number, depth: number) => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    if (buildPlateRef.current) {
+      scene.remove(buildPlateRef.current);
+      buildPlateRef.current.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (mesh.geometry) {
+          mesh.geometry.dispose();
+        }
+
+        const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
+        if (!material) return;
+
+        if (Array.isArray(material)) {
+          material.forEach((entry) => entry.dispose());
+        } else {
+          material.dispose();
+        }
+      });
+    }
+
+    const plate = createBuildPlate(width, depth);
+    scene.add(plate);
+    buildPlateRef.current = plate;
+    buildPlateSizeRef.current = { width, depth };
+  }, []);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -519,9 +548,7 @@ export default function STLViewer({
     fillLight.position.set(-220, -180, 180);
     scene.add(fillLight);
 
-    const plate = createBuildPlate(buildPlate.width, buildPlate.depth);
-    scene.add(plate);
-    buildPlateRef.current = plate;
+    updateBuildPlate(buildPlate.width, buildPlate.depth);
 
     const axesScene = new THREE.Scene();
     axesScene.background = new THREE.Color(0xe2e8f0);
@@ -583,19 +610,11 @@ export default function STLViewer({
         container.removeChild(renderer.domElement);
       }
     };
-  }, []);
+  }, [updateBuildPlate]);
 
   useEffect(() => {
-    if (!sceneRef.current) return;
-
-    if (buildPlateRef.current) {
-      sceneRef.current.remove(buildPlateRef.current);
-    }
-
-    const plate = createBuildPlate(buildPlate.width, buildPlate.depth);
-    sceneRef.current.add(plate);
-    buildPlateRef.current = plate;
-  }, [buildPlate.width, buildPlate.depth]);
+    updateBuildPlate(buildPlate.width, buildPlate.depth);
+  }, [buildPlate.width, buildPlate.depth, updateBuildPlate]);
 
   useEffect(() => {
     if (!sceneRef.current || !cameraRef.current || !controlsRef.current) return;
