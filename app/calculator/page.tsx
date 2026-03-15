@@ -82,7 +82,19 @@ export default function Calculator() {
         if (ext === 'stl') {
           stlBuffer = new Uint8Array(buffer);
           const loader = new STLLoader();
-          const geometry = loader.parse(buffer);
+          let geometry;
+
+          // detect ASCII STL
+          const text = new TextDecoder().decode(buffer.slice(0, 80));
+          const isASCII = text.toLowerCase().includes("solid");
+
+          if (isASCII) {
+            const ascii = new TextDecoder().decode(buffer);
+            geometry = loader.parse(ascii);
+          } else {
+            geometry = loader.parse(buffer);
+          }
+
           geometry.computeVertexNormals();
           const material = new THREE.MeshStandardMaterial({
             color: 0x00ff88,
