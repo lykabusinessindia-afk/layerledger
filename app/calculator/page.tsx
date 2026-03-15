@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useEffect, useCallback, type ChangeEvent, type DragEvent } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef, type ChangeEvent, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useInstallPrompt } from "@/lib/useInstallPrompt";
@@ -18,7 +18,7 @@ export default function Calculator() {
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   const [filamentUsed, setFilamentUsed] = useState("");
-  const [filamentPricePerKg, setFilamentPricePerKg] = useState("");
+  const [filamentPricePerKg, setFilamentPricePerKg] = useState("0");
   const [printTimeHours, setPrintTimeHours] = useState("");
   const [electricityRate, setElectricityRate] = useState("");
   const [machinePowerWatts, setMachinePowerWatts] = useState("");
@@ -31,6 +31,12 @@ export default function Calculator() {
 
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [modelVolume, setModelVolume] = useState(0);
+  const [modelDimensions, setModelDimensions] = useState({
+    width: 0,
+    depth: 0,
+    height: 0,
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parseNumber = (value: string) => {
     const parsed = parseFloat(value);
@@ -63,8 +69,23 @@ export default function Calculator() {
     setModelFile(file);
   };
 
-  const handleModelLoaded = useCallback((volumeCm3: number) => {
+  const handleClearModel = () => {
+    setModelFile(null);
+    setModelVolume(0);
+    setModelDimensions({ width: 0, depth: 0, height: 0 });
+    setFilamentUsed("0.00");
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleModelLoaded = useCallback((
+    volumeCm3: number,
+    dimensionsMm: { width: number; depth: number; height: number }
+  ) => {
     setModelVolume(volumeCm3);
+    setModelDimensions(dimensionsMm);
 
     const materialDensity = 1.24; // g/cm³ for PLA
     const grams = volumeCm3 * materialDensity;
@@ -296,10 +317,17 @@ export default function Calculator() {
           >
             <p>Drag & Drop STL file here</p>
             <input
+              ref={fileInputRef}
               type="file"
               accept=".stl"
               onChange={handleUpload}
             />
+            <button
+              onClick={handleClearModel}
+              className="mt-4 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-200 border border-gray-600"
+            >
+              Clear Model
+            </button>
           </div>
         </div>
 
@@ -320,6 +348,12 @@ export default function Calculator() {
               <span>{filamentMeters.toFixed(2)} meters</span>
             </div>
             <div className="flex justify-between">
+              <span>Model Dimensions (mm)</span>
+              <span>
+                {modelDimensions.width.toFixed(2)} x {modelDimensions.depth.toFixed(2)} x {modelDimensions.height.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between">
               <span>Filament Cost</span>
               <span>₹ {filamentCost.toFixed(2)}</span>
             </div>
@@ -332,10 +366,11 @@ export default function Calculator() {
           <input
             type="number"
             min={0}
+            step="any"
             placeholder="Filament Price per KG"
             className="p-3 rounded bg-gray-800"
             value={filamentPricePerKg}
-            onChange={(e) => setFilamentPricePerKg(e.target.value.replace(/-/g, ""))}
+            onChange={(e) => setFilamentPricePerKg(e.target.value)}
           />
           <input
             type="number"

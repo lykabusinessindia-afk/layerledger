@@ -7,7 +7,10 @@ import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 
 type STLViewerProps = {
   file: File | null;
-  onModelLoaded?: (volumeCm3: number) => void;
+  onModelLoaded?: (
+    volumeCm3: number,
+    dimensionsMm: { width: number; depth: number; height: number }
+  ) => void;
 };
 
 const computeGeometryVolumeCm3 = (geometry: THREE.BufferGeometry): number => {
@@ -121,13 +124,26 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
   }, []);
 
   useEffect(() => {
-    if (!file || !sceneRef.current || !cameraRef.current || !controlsRef.current) {
+    if (!sceneRef.current || !cameraRef.current || !controlsRef.current) {
       return;
     }
 
     const scene = sceneRef.current;
     const camera = cameraRef.current;
     const controls = controlsRef.current;
+
+    if (!file) {
+      scene.children
+        .filter((child) => child.type === "Mesh")
+        .forEach((mesh) => scene.remove(mesh));
+
+      camera.position.set(0, 100, 200);
+      camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix();
+      controls.target.set(0, 0, 0);
+      controls.update();
+      return;
+    }
 
     const reader = new FileReader();
 
@@ -141,11 +157,6 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
         const loader = new STLLoader();
         const geometry = loader.parse(result);
         geometry.computeVertexNormals();
-
-        const volumeCm3 = computeGeometryVolumeCm3(geometry);
-        if (onModelLoaded) {
-          onModelLoaded(volumeCm3);
-        }
 
         scene.children
           .filter((child) => child.type === "Mesh")
@@ -166,6 +177,16 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
         scene.add(mesh);
 
         const size = box.getSize(new THREE.Vector3());
+        const volumeCm3 = computeGeometryVolumeCm3(geometry);
+
+        if (onModelLoaded) {
+          onModelLoaded(volumeCm3, {
+            width: size.x,
+            depth: size.y,
+            height: size.z,
+          });
+        }
+
         const maxDim = Math.max(size.x, size.y, size.z, 1);
         const fov = (camera.fov * Math.PI) / 180;
         const distance = (maxDim / 2) / Math.tan(fov / 2);
