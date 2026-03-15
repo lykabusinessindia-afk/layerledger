@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { ThreeMFLoader } from "three/examples/jsm/loaders/3MFLoader.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 
 type STLViewerProps = {
@@ -58,8 +60,8 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+  const loadedObjectRef = useRef<THREE.Object3D | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -81,7 +83,6 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    rendererRef.current = renderer;
     container.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -132,10 +133,15 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
     const camera = cameraRef.current;
     const controls = controlsRef.current;
 
+    const removeLoadedObject = () => {
+      if (loadedObjectRef.current) {
+        scene.remove(loadedObjectRef.current);
+        loadedObjectRef.current = null;
+      }
+    };
+
     if (!file) {
-      scene.children
-        .filter((child) => child.type === "Mesh")
-        .forEach((mesh) => scene.remove(mesh));
+      removeLoadedObject();
 
       camera.position.set(0, 100, 200);
       camera.lookAt(0, 0, 0);
@@ -151,33 +157,82 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
       try {
         const result = event.target?.result;
         if (!(result instanceof ArrayBuffer)) {
-          throw new Error("Invalid STL file buffer");
+          throw new Error("Invalid model file buffer");
         }
 
-        const loader = new STLLoader();
-        const geometry = loader.parse(result);
-        geometry.computeVertexNormals();
+        const ext = file.name.split(".").pop()?.toLowerCase();
+        let modelObject: THREE.Object3D;
 
-        scene.children
-          .filter((child) => child.type === "Mesh")
-          .forEach((mesh) => scene.remove(mesh));
+        if (ext === "stl") {
+          const stlLoader = new STLLoader();
+          const geometry = stlLoader.parse(result);
+          geometry.computeVertexNormals();
 
-        const material = new THREE.MeshStandardMaterial({
-          color: 0x00ff88,
-          metalness: 0.15,
-          roughness: 0.65,
-        });
+          const material = new THREE.MeshStandardMaterial({
+            color: 0x00ff88,
+            metalness: 0.15,
+            roughness: 0.65,
+          });
 
-        const mesh = new THREE.Mesh(geometry, material);
+          modelObject = new THREE.Mesh(geometry, material);
+        } else if (ext === "obj") {
+          const text = new TextDecoder().decode(result);
+          const objLoader = new OBJLoader();
+          modelObject = objLoader.parse(text);
 
-        const box = new THREE.Box3().setFromObject(mesh);
+          modelObject.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              child.material = new THREE.MeshStandardMaterial({
+                color: 0x00ff88,
+                metalness: 0.15,
+                roughness: 0.65,
+              });
+              child.geometry.computeVertexNormals();
+            }
+          });
+        } else if (ext === "3mf") {
+          const threeMFLoader = new ThreeMFLoader();
+          modelObject = threeMFLoader.parse(result);
+
+          modelObject.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              child.material = new THREE.MeshStandardMaterial({
+                color: 0x00ff88,
+                metalness: 0.15,
+                roughness: 0.65,
+              });
+              child.geometry.computeVertexNormals();
+            }
+          });
+        } else {
+          throw new Error("Unsupported model format");
+        }
+
+        removeLoadedObject();
+
+        const box = new THREE.Box3().setFromObject(modelObject);
         const center = box.getCenter(new THREE.Vector3());
-        mesh.position.sub(center);
+        modelObject.position.sub(center);
 
-        scene.add(mesh);
+        scene.add(modelObject);
+        loadedObjectRef.current = modelObject;
+
+        modelObject.updateMatrixWorld(true);
 
         const size = box.getSize(new THREE.Vector3());
-        const volumeCm3 = computeGeometryVolumeCm3(geometry);
+        let volumeCm3 = 0;
+
+        modelObject.traverse((child) => {
+          if (!(child instanceof THREE.Mesh)) return;
+
+          const geometry = child.geometry;
+          if (!(geometry instanceof THREE.BufferGeometry)) return;
+
+          const worldGeometry = geometry.clone();
+          worldGeometry.applyMatrix4(child.matrixWorld);
+          volumeCm3 += computeGeometryVolumeCm3(worldGeometry);
+          worldGeometry.dispose();
+        });
 
         if (onModelLoaded) {
           onModelLoaded(volumeCm3, {
@@ -198,13 +253,13 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
         controls.target.set(0, 0, 0);
         controls.update();
       } catch (error) {
-        console.error("STL parsing error:", error);
-        alert("Failed to process STL model.");
+        console.error("Model parsing error:", error);
+        alert("Failed to process 3D model.");
       }
     };
 
     reader.onerror = () => {
-      alert("Failed to read STL file.");
+      alert("Failed to read model file.");
     };
 
     reader.readAsArrayBuffer(file);

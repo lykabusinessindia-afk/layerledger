@@ -31,6 +31,7 @@ export default function Calculator() {
 
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [modelVolume, setModelVolume] = useState(0);
+  const [estimatedPrintTime, setEstimatedPrintTime] = useState(0);
   const [modelDimensions, setModelDimensions] = useState({
     width: 0,
     depth: 0,
@@ -43,12 +44,17 @@ export default function Calculator() {
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
+  const isSupportedModelFile = (file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    return ext === "stl" || ext === "obj" || ext === "3mf";
+  };
+
   const handleUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith(".stl")) {
-      alert("Only STL files are supported.");
+    if (!isSupportedModelFile(file)) {
+      alert("Only STL, OBJ, and 3MF files are supported.");
       return;
     }
 
@@ -61,8 +67,8 @@ export default function Calculator() {
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith(".stl")) {
-      alert("Only STL files are supported.");
+    if (!isSupportedModelFile(file)) {
+      alert("Only STL, OBJ, and 3MF files are supported.");
       return;
     }
 
@@ -72,8 +78,10 @@ export default function Calculator() {
   const handleClearModel = () => {
     setModelFile(null);
     setModelVolume(0);
+    setEstimatedPrintTime(0);
     setModelDimensions({ width: 0, depth: 0, height: 0 });
     setFilamentUsed("0.00");
+    setPrintTimeHours("0.00");
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -91,10 +99,12 @@ export default function Calculator() {
     const grams = volumeCm3 * materialDensity;
     setFilamentUsed(grams.toFixed(2));
 
-    // Estimate print time
-    const layerHeight = 0.2; // mm
-    const printTimeHours = (volumeCm3 / 10) * (0.2 / layerHeight); // Simplified estimation
-    setPrintTimeHours(printTimeHours.toFixed(2));
+    // Estimate print time from volume and flow rate (default FDM flow: 12 mm³/s)
+    const volumeMm3 = volumeCm3 * 1000;
+    const flowRateMm3PerSecond = 12;
+    const estimatedHours = volumeMm3 / flowRateMm3PerSecond / 3600;
+    setEstimatedPrintTime(estimatedHours);
+    setPrintTimeHours(estimatedHours.toFixed(2));
   }, []);
 
   const {
@@ -315,11 +325,11 @@ export default function Calculator() {
               textAlign: "center"
             }}
           >
-            <p>Drag & Drop STL file here</p>
+            <p>Drag & Drop STL, OBJ, or 3MF file here</p>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".stl"
+              accept=".stl,.obj,.3mf"
               onChange={handleUpload}
             />
             <button
@@ -352,6 +362,10 @@ export default function Calculator() {
               <span>
                 {modelDimensions.width.toFixed(2)} x {modelDimensions.depth.toFixed(2)} x {modelDimensions.height.toFixed(2)}
               </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Estimated Print Time</span>
+              <span>{estimatedPrintTime.toFixed(2)} hours</span>
             </div>
             <div className="flex justify-between">
               <span>Filament Cost</span>
