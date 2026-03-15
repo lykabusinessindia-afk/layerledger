@@ -28,6 +28,7 @@ export default function Calculator() {
   const [failureRate, setFailureRate] = useState("5");
   const [gstPercent, setGstPercent] = useState("0");
   const [profitMargin, setProfitMargin] = useState("30");
+  const [filamentColor, setFilamentColor] = useState("#00ff88");
 
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [modelVolume, setModelVolume] = useState(0);
@@ -198,6 +199,25 @@ export default function Calculator() {
     return filamentUsedNum / 2.98;
   }, [filamentUsed]);
 
+  const instantPriceQuote = useMemo(() => {
+    const packagingCostNum = parseNumber(packagingCost);
+    const shippingCostNum = parseNumber(shippingCost);
+    const productionCost =
+      filamentCost +
+      electricityCost +
+      machineCost +
+      packagingCostNum +
+      shippingCostNum;
+
+    return productionCost * 1.3;
+  }, [
+    filamentCost,
+    electricityCost,
+    machineCost,
+    packagingCost,
+    shippingCost,
+  ]);
+
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
@@ -323,7 +343,11 @@ export default function Calculator() {
 
         {/* 3D MODEL PREVIEW */}
         <div className="mt-8 max-w-4xl mx-auto">
-          <STLViewer file={modelFile} onModelLoaded={handleModelLoaded} />
+          <STLViewer
+            file={modelFile}
+            filamentColor={filamentColor}
+            onModelLoaded={handleModelLoaded}
+          />
         </div>
 
         {/* STL UPLOAD */}
@@ -352,6 +376,27 @@ export default function Calculator() {
               Clear Model
             </button>
           </div>
+        </div>
+
+        {/* FILAMENT COLOR */}
+        <div className="mt-6 max-w-xl mx-auto">
+          <label className="block text-sm font-medium mb-2 text-gray-300">
+            Filament Color
+          </label>
+          <select
+            value={filamentColor}
+            onChange={(e) => setFilamentColor(e.target.value)}
+            className="w-full p-3 rounded bg-gray-800 border border-gray-700 text-white"
+          >
+            <option value="#ffffff">White</option>
+            <option value="#000000">Black</option>
+            <option value="#ef4444">Red</option>
+            <option value="#3b82f6">Blue</option>
+            <option value="#22c55e">Green</option>
+            <option value="#eab308">Yellow</option>
+            <option value="#f97316">Orange</option>
+            <option value="#9ca3af">Gray</option>
+          </select>
         </div>
 
         {/* MODEL ANALYSIS */}
@@ -393,6 +438,12 @@ export default function Calculator() {
               <span>₹ {filamentCost.toFixed(2)}</span>
             </div>
           </div>
+        </div>
+
+        {/* INSTANT PRICE QUOTE */}
+        <div className="mt-6 bg-green-900/30 border border-green-500/40 p-5 rounded-xl max-w-xl mx-auto text-center shadow-lg">
+          <h3 className="text-lg font-semibold text-green-300">Instant Price Quote</h3>
+          <p className="text-3xl font-extrabold text-green-400 mt-2">₹{instantPriceQuote.toFixed(2)}</p>
         </div>
 
         {/* INPUTS */}

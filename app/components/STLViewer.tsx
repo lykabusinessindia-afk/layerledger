@@ -9,6 +9,7 @@ import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 
 type STLViewerProps = {
   file: File | null;
+  filamentColor: string;
   onModelLoaded?: (
     volumeCm3: number,
     dimensionsMm: { width: number; depth: number; height: number }
@@ -56,12 +57,17 @@ const computeGeometryVolumeCm3 = (geometry: THREE.BufferGeometry): number => {
   return volumeMm3 / 1000;
 };
 
-export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
+export default function STLViewer({ file, filamentColor, onModelLoaded }: STLViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const loadedObjectRef = useRef<THREE.Object3D | null>(null);
+  const filamentColorRef = useRef(filamentColor);
+
+  useEffect(() => {
+    filamentColorRef.current = filamentColor;
+  }, [filamentColor]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -169,7 +175,7 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
           geometry.computeVertexNormals();
 
           const material = new THREE.MeshStandardMaterial({
-            color: 0x00ff88,
+            color: filamentColorRef.current,
             metalness: 0.15,
             roughness: 0.65,
           });
@@ -183,7 +189,7 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
           modelObject.traverse((child) => {
             if (child instanceof THREE.Mesh) {
               child.material = new THREE.MeshStandardMaterial({
-                color: 0x00ff88,
+                color: filamentColorRef.current,
                 metalness: 0.15,
                 roughness: 0.65,
               });
@@ -197,7 +203,7 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
           modelObject.traverse((child) => {
             if (child instanceof THREE.Mesh) {
               child.material = new THREE.MeshStandardMaterial({
-                color: 0x00ff88,
+                color: filamentColorRef.current,
                 metalness: 0.15,
                 roughness: 0.65,
               });
@@ -264,6 +270,31 @@ export default function STLViewer({ file, onModelLoaded }: STLViewerProps) {
 
     reader.readAsArrayBuffer(file);
   }, [file, onModelLoaded]);
+
+  useEffect(() => {
+    if (!loadedObjectRef.current) {
+      return;
+    }
+
+    loadedObjectRef.current.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) {
+        return;
+      }
+
+      const applyColor = (material: THREE.Material) => {
+        if ("color" in material) {
+          (material as THREE.MeshStandardMaterial).color.set(filamentColor);
+          material.needsUpdate = true;
+        }
+      };
+
+      if (Array.isArray(child.material)) {
+        child.material.forEach(applyColor);
+      } else if (child.material) {
+        applyColor(child.material);
+      }
+    });
+  }, [filamentColor]);
 
   return (
     <div
