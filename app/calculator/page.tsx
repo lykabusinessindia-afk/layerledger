@@ -429,20 +429,35 @@ export default function Calculator() {
           <label className="block text-sm font-medium mb-2 text-gray-300">
             Filament Color
           </label>
-          <select
-            value={filamentColor}
-            onChange={(e) => setFilamentColor(e.target.value)}
-            className="w-full p-3 rounded bg-gray-800 border border-gray-700 text-white"
-          >
-            <option value="#ffffff">White</option>
-            <option value="#000000">Black</option>
-            <option value="#ef4444">Red</option>
-            <option value="#3b82f6">Blue</option>
-            <option value="#22c55e">Green</option>
-            <option value="#eab308">Yellow</option>
-            <option value="#f97316">Orange</option>
-            <option value="#9ca3af">Gray</option>
-          </select>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {[
+              { name: "White", value: "#ffffff" },
+              { name: "Black", value: "#000000" },
+              { name: "Red", value: "#ef4444" },
+              { name: "Blue", value: "#3b82f6" },
+              { name: "Green", value: "#22c55e" },
+              { name: "Yellow", value: "#eab308" },
+              { name: "Orange", value: "#f97316" },
+              { name: "Gray", value: "#9ca3af" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setFilamentColor(option.value)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-150 ${
+                  filamentColor === option.value
+                    ? "border-green-400 bg-green-900/30"
+                    : "border-gray-700 bg-gray-800 hover:bg-gray-700"
+                }`}
+              >
+                <span
+                  className="inline-block h-4 w-4 rounded-full border border-gray-500"
+                  style={{ backgroundColor: option.value }}
+                />
+                <span className="text-sm text-white">{option.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* MODEL ANALYSIS */}
@@ -472,7 +487,7 @@ export default function Calculator() {
             <div className="flex justify-between">
               <span>Model Dimensions (mm)</span>
               <span>
-                {modelDimensions.width.toFixed(2)} x {modelDimensions.depth.toFixed(2)} x {modelDimensions.height.toFixed(2)}
+                {modelDimensions.width.toFixed(2)} × {modelDimensions.depth.toFixed(2)} × {modelDimensions.height.toFixed(2)} mm
               </span>
             </div>
             <div className="flex justify-between">
