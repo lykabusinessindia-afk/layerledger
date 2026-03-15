@@ -6,8 +6,6 @@ import { useInstallPrompt } from "@/lib/useInstallPrompt";
 import parse from "stl-parser";
 import * as THREE from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
-import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
-import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 export default function Calculator() {
@@ -60,14 +58,63 @@ export default function Calculator() {
     return Math.abs(volume) / 1000; // Convert mm³ to cm³
   };
 
-  const handleModelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const loadSTLModel = (buffer: ArrayBuffer) => {
+    try {
+      const loader = new STLLoader();
+      let geometry;
+
+      // detect ASCII STL
+      const text = new TextDecoder().decode(buffer.slice(0, 80));
+      const isASCII = text.toLowerCase().includes("solid");
+
+      if (isASCII) {
+        const ascii = new TextDecoder().decode(buffer);
+        geometry = loader.parse(ascii);
+      } else {
+        geometry = loader.parse(buffer);
+      }
+
+      geometry.computeVertexNormals();
+
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x00ff88,
+        metalness: 0.15,
+        roughness: 0.65
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+
+      mesh.rotation.x = -Math.PI / 2;
+
+      // Remove previous model but keep lights
+      if (sceneRef.current) {
+        sceneRef.current.children = sceneRef.current.children.filter(obj => obj.type !== "Mesh");
+        sceneRef.current.add(mesh);
+
+        if (cameraRef.current) {
+          cameraRef.current.position.set(0, 100, 200);
+          cameraRef.current.lookAt(0, 0, 0);
+        }
+
+        if (controlsRef.current) {
+          controlsRef.current.reset();
+          controlsRef.current.update();
+        }
+
+        setModelLoaded(true);
+      }
+    } catch (error) {
+      console.error("STL parsing error:", error);
+      alert("Failed to process STL model.");
+    }
+  };
+
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const ext = file.name.split('.').pop()?.toLowerCase();
-
-    if (!ext || !['stl', 'obj'].includes(ext)) {
-      alert('Unsupported file format. Please upload STL or OBJ.');
+    if (!file.name.toLowerCase().endsWith(".stl")) {
+      alert("Only STL files are supported.");
       return;
     }
 
@@ -76,118 +123,69 @@ export default function Calculator() {
     reader.onload = async (event) => {
       try {
         const buffer = event.target?.result as ArrayBuffer;
-        let object: THREE.Object3D | null = null;
-        let stlBuffer: Uint8Array | null = null;
+        const stlBuffer = new Uint8Array(buffer);
 
-        if (ext === 'stl') {
-          stlBuffer = new Uint8Array(buffer);
-          const loader = new STLLoader();
-          let geometry;
+        // Load model
+        loadSTLModel(buffer);
 
-          // detect ASCII STL
-          const text = new TextDecoder().decode(buffer.slice(0, 80));
-          const isASCII = text.toLowerCase().includes("solid");
-
-          if (isASCII) {
-            const ascii = new TextDecoder().decode(buffer);
-            geometry = loader.parse(ascii);
-          } else {
-            geometry = loader.parse(buffer);
-          }
-
-          geometry.computeVertexNormals();
-          const material = new THREE.MeshStandardMaterial({
-            color: 0x00ff88,
-            metalness: 0.1,
-            roughness: 0.6
-          });
-          object = new THREE.Mesh(geometry, material);
-        } else if (ext === 'obj') {
-          const text = new TextDecoder().decode(buffer);
-          const loader = new OBJLoader();
-          object = loader.parse(text);
-
-          // Convert to STL for volume calculation
-          let mesh: THREE.Mesh | null = null;
-          object.traverse((child) => {
-            if (child instanceof THREE.Mesh && !mesh) {
-              mesh = child;
-            }
-          });
-
-          if (!mesh) {
-            alert('Model does not contain valid mesh geometry.');
-            return;
-          }
-
-          const exporter = new STLExporter();
-          const stlData = exporter.parse(mesh);
-          stlBuffer = new TextEncoder().encode(stlData);
-        }
-
-        if (!object) {
-          alert('Unsupported model format.');
-          return;
-        }
-
-        if (!stlBuffer) {
-          alert('Failed to generate STL buffer for volume calculation.');
-          return;
-        }
-
-        // Parse STL for volume calculation
+        // Volume calculation
         const stl = parse(stlBuffer);
         const volumeCm3 = computeVolume(stl.triangles);
         const density = 1.25; // g/cm³ for PLA
         const grams = volumeCm3 * density;
         setFilamentUsed(grams.toFixed(2));
 
-        // Estimate print time (simple formula: volume / 10 * layer height factor)
+        // Estimate print time
         const layerHeight = 0.2; // mm
         const printTimeHours = (volumeCm3 / 10) * (0.2 / layerHeight); // Simplified estimation
         setPrintTimeHours(printTimeHours.toFixed(2));
 
-        // Add to 3D preview
-        if (sceneRef.current) {
-          // Clear previous model
-          sceneRef.current.children.forEach(child => {
-            if (child instanceof THREE.Mesh || child instanceof THREE.Group) {
-              sceneRef.current!.remove(child);
-            }
-          });
-
-          // Add new model
-          sceneRef.current.add(object);
-
-          // Center and fit camera
-          const box = new THREE.Box3().setFromObject(object);
-          const center = box.getCenter(new THREE.Vector3());
-          const size = box.getSize(new THREE.Vector3());
-
-          object.position.sub(center);
-
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const fov = cameraRef.current!.fov * (Math.PI / 180);
-          const cameraDistance = Math.abs(maxDim / Math.sin(fov / 2));
-
-          cameraRef.current!.position.set(0, 0, cameraDistance * 1.5);
-          cameraRef.current!.lookAt(0, 0, 0);
-
-          if (controlsRef.current) {
-            controlsRef.current.reset();
-            controlsRef.current.update();
-          }
-
-          setModelLoaded(true);
-        }
       } catch (error) {
         console.error('File processing error:', error);
         alert('Failed to process 3D model.');
       }
     };
 
-    reader.onerror = () => {
-      alert('Failed to read model file.');
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".stl")) {
+      alert("Only STL files are supported.");
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      try {
+        const buffer = event.target?.result as ArrayBuffer;
+        const stlBuffer = new Uint8Array(buffer);
+
+        // Load model
+        loadSTLModel(buffer);
+
+        // Volume calculation
+        const stl = parse(stlBuffer);
+        const volumeCm3 = computeVolume(stl.triangles);
+        const density = 1.25; // g/cm³ for PLA
+        const grams = volumeCm3 * density;
+        setFilamentUsed(grams.toFixed(2));
+
+        // Estimate print time
+        const layerHeight = 0.2; // mm
+        const printTimeHours = (volumeCm3 / 10) * (0.2 / layerHeight); // Simplified estimation
+        setPrintTimeHours(printTimeHours.toFixed(2));
+
+      } catch (error) {
+        console.error('File processing error:', error);
+        alert('Failed to process 3D model.');
+      }
     };
 
     reader.readAsArrayBuffer(file);
@@ -463,7 +461,7 @@ export default function Calculator() {
             />
             {!modelLoaded && (
               <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-lg pointer-events-none">
-                Upload a 3D model to preview
+                Upload an STL model to preview
               </div>
             )}
           </div>
@@ -471,15 +469,23 @@ export default function Calculator() {
 
         {/* STL UPLOAD */}
         <div className="mt-8 max-w-xl mx-auto">
-          <label className="block text-sm font-medium mb-2 text-gray-300">
-            Upload 3D Model (STL, OBJ)
-          </label>
-          <input
-            type="file"
-            accept=".stl,.obj"
-            onChange={handleModelUpload}
-            className="p-2 rounded bg-gray-800 text-white w-full"
-          />
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            style={{
+              border: "2px dashed #00ff88",
+              padding: "40px",
+              borderRadius: "12px",
+              textAlign: "center"
+            }}
+          >
+            <p>Drag & Drop STL file here</p>
+            <input
+              type="file"
+              accept=".stl"
+              onChange={handleUpload}
+            />
+          </div>
         </div>
 
         {/* INPUTS */}
