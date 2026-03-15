@@ -1,13 +1,14 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useInstallPrompt } from "@/lib/useInstallPrompt";
 
 export default function Calculator() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const { promptInstall } = useInstallPrompt();
 
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const [joining, setJoining] = useState(false);
@@ -15,30 +16,95 @@ export default function Calculator() {
   const [feedback, setFeedback] = useState("");
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
-  const [filamentUsed, setFilamentUsed] = useState(0);
-  const [filamentPricePerKg, setFilamentPricePerKg] = useState(0);
-  const [printTimeHours, setPrintTimeHours] = useState(0);
-  const [electricityRate, setElectricityRate] = useState(0);
-  const [machinePowerWatts, setMachinePowerWatts] = useState(0);
-  const [machineCostPerHour, setMachineCostPerHour] = useState(0);
-  const [packagingCost, setPackagingCost] = useState(0);
-  const [shippingCost, setShippingCost] = useState(0);
-  const [failureRate, setFailureRate] = useState(5);
-  const [gstPercent, setGstPercent] = useState(0);
-  const [profitMargin, setProfitMargin] = useState(30);
+  const [filamentUsed, setFilamentUsed] = useState("");
+  const [filamentPricePerKg, setFilamentPricePerKg] = useState("");
+  const [printTimeHours, setPrintTimeHours] = useState("");
+  const [electricityRate, setElectricityRate] = useState("");
+  const [machinePowerWatts, setMachinePowerWatts] = useState("");
+  const [machineCostPerHour, setMachineCostPerHour] = useState("");
+  const [packagingCost, setPackagingCost] = useState("");
+  const [shippingCost, setShippingCost] = useState("");
+  const [failureRate, setFailureRate] = useState("5");
+  const [gstPercent, setGstPercent] = useState("0");
+  const [profitMargin, setProfitMargin] = useState("30");
 
-  useEffect(() => {
-    const handler = (e:any) => {
-      e.preventDefault();
-      setInstallPrompt(e);
+  const parseNumber = (value: string) => {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const {
+    filamentCost,
+    electricityCost,
+    machineCost,
+    totalCost,
+    adjustedCost,
+    baseSellingPrice,
+    gstAmount,
+    sellingPrice,
+    profitAmount,
+  } = useMemo(() => {
+    const filamentUsedNum = parseNumber(filamentUsed);
+    const filamentPriceNum = parseNumber(filamentPricePerKg);
+    const printHoursNum = parseNumber(printTimeHours);
+    const electricityRateNum = parseNumber(electricityRate);
+    const machinePowerNum = parseNumber(machinePowerWatts);
+    const machineCostPerHourNum = parseNumber(machineCostPerHour);
+    const packagingCostNum = parseNumber(packagingCost);
+    const shippingCostNum = parseNumber(shippingCost);
+    const failureRateNum = parseNumber(failureRate);
+    const gstPercentNum = parseNumber(gstPercent);
+    const profitMarginNum = parseNumber(profitMargin);
+
+    const filamentCost = (filamentUsedNum / 1000) * filamentPriceNum;
+
+    const electricityCost =
+      (machinePowerNum / 1000) * printHoursNum * electricityRateNum;
+
+    const machineCost = machineCostPerHourNum * printHoursNum;
+
+    const totalCost =
+      filamentCost +
+      electricityCost +
+      packagingCostNum +
+      shippingCostNum +
+      machineCost;
+
+    const adjustedCost = totalCost * (1 + failureRateNum / 100);
+
+    const baseSellingPrice =
+      adjustedCost + (adjustedCost * profitMarginNum) / 100;
+
+    const gstAmount = (baseSellingPrice * gstPercentNum) / 100;
+
+    const sellingPrice = baseSellingPrice + gstAmount;
+
+    const profitAmount = baseSellingPrice - adjustedCost;
+
+    return {
+      filamentCost,
+      electricityCost,
+      machineCost,
+      totalCost,
+      adjustedCost,
+      baseSellingPrice,
+      gstAmount,
+      sellingPrice,
+      profitAmount,
     };
-
-    window.addEventListener("beforeinstallprompt", handler);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handler);
-    };
-  }, []);
+  }, [
+    filamentUsed,
+    filamentPricePerKg,
+    printTimeHours,
+    electricityRate,
+    machinePowerWatts,
+    machineCostPerHour,
+    packagingCost,
+    shippingCost,
+    failureRate,
+    gstPercent,
+    profitMargin,
+  ]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -50,38 +116,37 @@ export default function Calculator() {
   }, [router]);
   
   const handleInstall = async () => {
-    if (!installPrompt) return;
-
-    installPrompt.prompt();
-
-    const { outcome } = await installPrompt.userChoice;
-
-    if (outcome === "accepted") {
-      console.log("App installed");
-    }
-
-    setInstallPrompt(null);
+    const accepted = await promptInstall();
+    if (accepted) console.log("App installed");
   };
-
+  
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push("/");
   };
+
   const redirectToLyka = () => {
-  window.open("https://www.lyka3dstudio.com", "_blank");
-};
+    window.open("https://www.lyka3dstudio.com", "_blank");
+  };
 
   const handleWaitlist = async () => {
     if (!waitlistEmail) return alert("Enter email");
 
     setJoining(true);
 
-    await supabase.from("waitlist").insert([{ email: waitlistEmail }]);
+    const { error } = await supabase
+      .from("waitlist")
+      .insert([{ email: waitlistEmail }]);
+
+    setJoining(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
     alert("You're on the waitlist 🚀");
-
     setWaitlistEmail("");
-    setJoining(false);
   };
 
   const handleFeedbackSubmit = async () => {
@@ -89,39 +154,20 @@ export default function Calculator() {
 
     setSubmittingFeedback(true);
 
-    await supabase.from("feedback").insert([{ message: feedback }]);
+    const { error } = await supabase
+      .from("feedback")
+      .insert([{ message: feedback }]);
+
+    setSubmittingFeedback(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
     alert("Thanks for feedback 🙌");
-
     setFeedback("");
-    setSubmittingFeedback(false);
   };
-
-  const filamentCost = (filamentUsed / 1000) * filamentPricePerKg;
-
-  const electricityCost =
-    (machinePowerWatts / 1000) * printTimeHours * electricityRate;
-
-  const machineCost = machineCostPerHour * printTimeHours;
-
-  const totalCost =
-    filamentCost +
-    electricityCost +
-    packagingCost +
-    shippingCost +
-    machineCost;
-
-  const adjustedCost = totalCost * (1 + failureRate / 100);
-
-  const baseSellingPrice =
-    adjustedCost + (adjustedCost * profitMargin) / 100;
-
-  const gstAmount = (baseSellingPrice * gstPercent) / 100;
-
-  const sellingPrice = baseSellingPrice + gstAmount;
-
-  const profitAmount = baseSellingPrice - adjustedCost;
-
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
@@ -186,17 +232,94 @@ export default function Calculator() {
         {/* INPUTS */}
         <div className="flex flex-col gap-4 max-w-xl mx-auto mt-10">
 
-          <input type="number" placeholder="Filament Used (grams)" className="p-3 rounded bg-gray-800" onChange={(e)=>setFilamentUsed(Number(e.target.value))}/>
-          <input type="number" placeholder="Filament Price per KG" className="p-3 rounded bg-gray-800" onChange={(e)=>setFilamentPricePerKg(Number(e.target.value))}/>
-          <input type="number" placeholder="Print Time (hours)" className="p-3 rounded bg-gray-800" onChange={(e)=>setPrintTimeHours(Number(e.target.value))}/>
-          <input type="number" placeholder="Electricity Rate (per kWh)" className="p-3 rounded bg-gray-800" onChange={(e)=>setElectricityRate(Number(e.target.value))}/>
-          <input type="number" placeholder="Machine Power (Watts)" className="p-3 rounded bg-gray-800" onChange={(e)=>setMachinePowerWatts(Number(e.target.value))}/>
-          <input type="number" placeholder="Machine Cost Per Hour" className="p-3 rounded bg-gray-800" onChange={(e)=>setMachineCostPerHour(Number(e.target.value))}/>
-          <input type="number" placeholder="Packaging Cost" className="p-3 rounded bg-gray-800" onChange={(e)=>setPackagingCost(Number(e.target.value))}/>
-          <input type="number" placeholder="Shipping Cost" className="p-3 rounded bg-gray-800" onChange={(e)=>setShippingCost(Number(e.target.value))}/>
-          <input type="number" placeholder="Failure Rate %" className="p-3 rounded bg-gray-800" onChange={(e)=>setFailureRate(Number(e.target.value))}/>
-          <input type="number" placeholder="Profit Margin %" className="p-3 rounded bg-gray-800" onChange={(e)=>setProfitMargin(Number(e.target.value))}/>
-          <input type="number" placeholder="GST %" className="p-3 rounded bg-gray-800" onChange={(e)=>setGstPercent(Number(e.target.value))}/>
+          <input
+            type="number"
+            min={0}
+            placeholder="Filament Used (grams)"
+            className="p-3 rounded bg-gray-800"
+            value={filamentUsed}
+            onChange={(e) => setFilamentUsed(e.target.value.replace(/-/g, ""))}
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Filament Price per KG"
+            className="p-3 rounded bg-gray-800"
+            value={filamentPricePerKg}
+            onChange={(e) => setFilamentPricePerKg(e.target.value.replace(/-/g, ""))}
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Print Time (hours)"
+            className="p-3 rounded bg-gray-800"
+            value={printTimeHours}
+            onChange={(e) => setPrintTimeHours(e.target.value.replace(/-/g, ""))}
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Electricity Rate (per kWh)"
+            className="p-3 rounded bg-gray-800"
+            value={electricityRate}
+            onChange={(e) => setElectricityRate(e.target.value.replace(/-/g, ""))}
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Machine Power (Watts)"
+            className="p-3 rounded bg-gray-800"
+            value={machinePowerWatts}
+            onChange={(e) => setMachinePowerWatts(e.target.value.replace(/-/g, ""))}
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Machine Cost Per Hour"
+            className="p-3 rounded bg-gray-800"
+            value={machineCostPerHour}
+            onChange={(e) => setMachineCostPerHour(e.target.value.replace(/-/g, ""))}
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Packaging Cost"
+            className="p-3 rounded bg-gray-800"
+            value={packagingCost}
+            onChange={(e) => setPackagingCost(e.target.value.replace(/-/g, ""))}
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Shipping Cost"
+            className="p-3 rounded bg-gray-800"
+            value={shippingCost}
+            onChange={(e) => setShippingCost(e.target.value.replace(/-/g, ""))}
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Failure Rate %"
+            className="p-3 rounded bg-gray-800"
+            value={failureRate}
+            onChange={(e) => setFailureRate(e.target.value.replace(/-/g, ""))}
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Profit Margin %"
+            className="p-3 rounded bg-gray-800"
+            value={profitMargin}
+            onChange={(e) => setProfitMargin(e.target.value.replace(/-/g, ""))}
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="GST %"
+            className="p-3 rounded bg-gray-800"
+            value={gstPercent}
+            onChange={(e) => setGstPercent(e.target.value.replace(/-/g, ""))}
+          />
 
         </div>
 
@@ -208,8 +331,28 @@ export default function Calculator() {
           <div className="space-y-2 text-gray-300">
 
             <div className="flex justify-between">
+              <span>Filament Cost</span>
+              <span>₹ {filamentCost.toFixed(2)}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span>Electricity Cost</span>
+              <span>₹ {electricityCost.toFixed(2)}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span>Machine Cost</span>
+              <span>₹ {machineCost.toFixed(2)}</span>
+            </div>
+
+            <div className="flex justify-between">
               <span>Total Production Cost</span>
               <span>₹ {totalCost.toFixed(2)}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span>Adjusted Cost (w/ failure)</span>
+              <span>₹ {adjustedCost.toFixed(2)}</span>
             </div>
 
             <div className="flex justify-between text-green-400">

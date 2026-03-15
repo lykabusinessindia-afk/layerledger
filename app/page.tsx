@@ -3,35 +3,16 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { useInstallPrompt } from "@/lib/useInstallPrompt";
 
 export default function Home() {
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const { promptInstall } = useInstallPrompt();
 
-useEffect(() => {
-  const handler = (e: any) => {
-    e.preventDefault();
-    setInstallPrompt(e);
+  const handleInstall = async () => {
+    const accepted = await promptInstall();
+    if (accepted) console.log("App installed");
   };
 
-  window.addEventListener("beforeinstallprompt", handler);
-
-  return () => {
-    window.removeEventListener("beforeinstallprompt", handler);
-  };
-}, []);
-
-const handleInstall = async () => {
-  if (!installPrompt) return;
-
-  installPrompt.prompt();
-  const { outcome } = await installPrompt.userChoice;
-
-  if (outcome === "accepted") {
-    console.log("App installed");
-  }
-
-  setInstallPrompt(null);
-};
   const router = useRouter();
 
   const [showLogin, setShowLogin] = useState(false);
