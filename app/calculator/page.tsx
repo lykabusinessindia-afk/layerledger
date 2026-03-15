@@ -5,6 +5,25 @@ import { supabase } from "@/lib/supabase";
 import { useInstallPrompt } from "@/lib/useInstallPrompt";
 import STLViewer from "@/components/STLViewer";
 
+type PrinterOption = {
+  name: string;
+  buildVolume: { width: number; depth: number; height: number };
+};
+
+const PRINTER_OPTIONS: PrinterOption[] = [
+  { name: "Ender 3", buildVolume: { width: 220, depth: 220, height: 250 } },
+  { name: "Ender 3 V3 SE", buildVolume: { width: 220, depth: 220, height: 250 } },
+  { name: "Bambu Lab A1", buildVolume: { width: 256, depth: 256, height: 256 } },
+  { name: "Bambu Lab A1 Mini", buildVolume: { width: 180, depth: 180, height: 180 } },
+  { name: "Bambu Lab P1P", buildVolume: { width: 256, depth: 256, height: 256 } },
+  { name: "Bambu Lab X1 Carbon", buildVolume: { width: 256, depth: 256, height: 256 } },
+  { name: "Prusa MK4", buildVolume: { width: 250, depth: 210, height: 220 } },
+  { name: "Creality K1", buildVolume: { width: 220, depth: 220, height: 250 } },
+  { name: "Anycubic Kobra 2", buildVolume: { width: 220, depth: 220, height: 250 } },
+  { name: "Elegoo Neptune 4", buildVolume: { width: 225, depth: 225, height: 265 } },
+  { name: "Elegoo OrangeStorm Giga", buildVolume: { width: 800, depth: 800, height: 1000 } },
+];
+
 export default function Calculator() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -29,6 +48,7 @@ export default function Calculator() {
   const [gstPercent, setGstPercent] = useState("0");
   const [profitMargin, setProfitMargin] = useState("30");
   const [filamentColor, setFilamentColor] = useState("#00ff88");
+  const [selectedPrinter, setSelectedPrinter] = useState(PRINTER_OPTIONS[0].name);
 
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [modelVolume, setModelVolume] = useState(0);
@@ -231,6 +251,19 @@ export default function Calculator() {
     packagingCost,
     shippingCost,
   ]);
+
+  const selectedPrinterDetails = useMemo(
+    () => PRINTER_OPTIONS.find((printer) => printer.name === selectedPrinter) ?? PRINTER_OPTIONS[0],
+    [selectedPrinter]
+  );
+
+  const modelHasDimensions =
+    modelDimensions.width > 0 || modelDimensions.depth > 0 || modelDimensions.height > 0;
+
+  const modelFitsSelectedPrinter =
+    modelDimensions.width <= selectedPrinterDetails.buildVolume.width &&
+    modelDimensions.depth <= selectedPrinterDetails.buildVolume.depth &&
+    modelDimensions.height <= selectedPrinterDetails.buildVolume.height;
 
   useEffect(() => {
     const checkUser = async () => {
@@ -457,6 +490,44 @@ export default function Calculator() {
                 <span className="text-sm text-white">{option.name}</span>
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* PRINTER COMPATIBILITY */}
+        <div className="mt-8 bg-gray-900 p-5 rounded-xl max-w-xl mx-auto border border-gray-700">
+          <label className="block text-sm font-medium mb-2 text-gray-300">Select Printer</label>
+          <select
+            value={selectedPrinter}
+            onChange={(e) => setSelectedPrinter(e.target.value)}
+            className="w-full p-3 rounded bg-gray-800 border border-gray-700 text-white"
+          >
+            {PRINTER_OPTIONS.map((printer) => (
+              <option key={printer.name} value={printer.name}>
+                {printer.name} - {printer.buildVolume.width} × {printer.buildVolume.depth} × {printer.buildVolume.height} mm
+              </option>
+            ))}
+          </select>
+
+          <div className="mt-4 space-y-2 text-gray-300 text-sm">
+            <div className="flex justify-between">
+              <span>Model Dimensions</span>
+              <span>
+                {modelDimensions.width.toFixed(2)} × {modelDimensions.depth.toFixed(2)} × {modelDimensions.height.toFixed(2)} mm
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Printer Build Volume</span>
+              <span>
+                {selectedPrinterDetails.buildVolume.width} × {selectedPrinterDetails.buildVolume.depth} × {selectedPrinterDetails.buildVolume.height} mm
+              </span>
+            </div>
+            {!modelHasDimensions ? (
+              <p className="text-yellow-400">Upload a model to check printer compatibility.</p>
+            ) : modelFitsSelectedPrinter ? (
+              <p className="text-green-400">✅ Model fits on this printer</p>
+            ) : (
+              <p className="text-yellow-400">⚠️ Model exceeds the printer build volume.</p>
+            )}
           </div>
         </div>
 
