@@ -7,62 +7,30 @@ import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { ThreeMFLoader } from "three/examples/jsm/loaders/3MFLoader.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 
-type STLViewerProps = {
-  file: File | null;
-  filamentColor: string;
-  buildPlate: { width: number; depth: number };
-  onModelLoaded?: (
-    volumeCm3: number,
-    dimensionsMm: { width: number; depth: number; height: number }
-  ) => void;
+export type ViewerModel = {
+  id: string;
+  name: string;
+  file: File;
+  scale: number;
+  positionX: number;
+  positionY: number;
+  rotationZ: number;
 };
 
-const createBuildPlate = (width: number, depth: number) => {
-  const plateGroup = new THREE.Group();
-
-  const plate = new THREE.Mesh(
-    new THREE.PlaneGeometry(width, depth),
-    new THREE.MeshStandardMaterial({
-      color: 0x1f2937,
-      metalness: 0.05,
-      roughness: 0.95,
-      transparent: true,
-      opacity: 0.55,
-      side: THREE.DoubleSide,
-    })
-  );
-  plate.rotation.x = -Math.PI / 2;
-  plate.position.y = 0;
-  plateGroup.add(plate);
-
-  const gridSpacing = width <= 250 && depth <= 250 ? 10 : 20;
-  const halfW = width / 2;
-  const halfD = depth / 2;
-  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x374151 });
-
-  const gridPoints: THREE.Vector3[] = [];
-  for (let x = -halfW; x <= halfW; x += gridSpacing) {
-    gridPoints.push(new THREE.Vector3(x, 0.01, -halfD));
-    gridPoints.push(new THREE.Vector3(x, 0.01, halfD));
-  }
-
-  for (let z = -halfD; z <= halfD; z += gridSpacing) {
-    gridPoints.push(new THREE.Vector3(-halfW, 0.01, z));
-    gridPoints.push(new THREE.Vector3(halfW, 0.01, z));
-  }
-
-  const gridGeometry = new THREE.BufferGeometry().setFromPoints(gridPoints);
-  const gridLines = new THREE.LineSegments(gridGeometry, lineMaterial);
-  plateGroup.add(gridLines);
-
-  return plateGroup;
+type STLViewerProps = {
+  models: ViewerModel[];
+  selectedModelId: string | null;
+  filamentColor: string;
+  buildPlate: { width: number; depth: number };
+  onAnalysisChange?: (payload: {
+    totalVolumeCm3: number;
+    dimensionsMm: { width: number; depth: number; height: number };
+  }) => void;
 };
 
 const computeGeometryVolumeCm3 = (geometry: THREE.BufferGeometry): number => {
   const position = geometry.getAttribute("position");
-  if (!position) {
-    return 0;
-  }
+  if (!position) return 0;
 
   const getVertex = (vertexIndex: number, target: THREE.Vector3) => {
     target.set(
@@ -95,18 +63,79 @@ const computeGeometryVolumeCm3 = (geometry: THREE.BufferGeometry): number => {
     }
   }
 
-  const volumeMm3 = Math.abs(signedVolume);
-  return volumeMm3 / 1000;
+  return Math.abs(signedVolume) / 1000;
 };
 
-export default function STLViewer({ file, filamentColor, buildPlate, onModelLoaded }: STLViewerProps) {
+const createBuildPlate = (width: number, depth: number) => {
+  const plateGroup = new THREE.Group();
+
+  const plate = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, depth),
+    new THREE.MeshStandardMaterial({
+      color: 0x1f2937,
+      metalness: 0.05,
+      roughness: 0.95,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+    })
+  );
+  plate.position.z = 0;
+  plateGroup.add(plate);
+
+  const gridSpacing = width <= 250 && depth <= 250 ? 10 : 20;
+  const halfW = width / 2;
+  const halfD = depth / 2;
+
+  const gridPoints: THREE.Vector3[] = [];
+  for (let x = -halfW; x <= halfW; x += gridSpacing) {
+    gridPoints.push(new THREE.Vector3(x, -halfD, 0.01));
+    gridPoints.push(new THREE.Vector3(x, halfD, 0.01));
+  }
+  for (let y = -halfD; y <= halfD; y += gridSpacing) {
+    gridPoints.push(new THREE.Vector3(-halfW, y, 0.01));
+    gridPoints.push(new THREE.Vector3(halfW, y, 0.01));
+  }
+
+  const gridGeometry = new THREE.BufferGeometry().setFromPoints(gridPoints);
+  const gridLines = new THREE.LineSegments(
+    gridGeometry,
+    new THREE.LineBasicMaterial({ color: 0x374151 })
+  );
+  plateGroup.add(gridLines);
+
+  return plateGroup;
+};
+
+const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result;
+      if (result instanceof ArrayBuffer) resolve(result);
+      else reject(new Error("Invalid model file buffer"));
+    };
+    reader.onerror = () => reject(new Error("Failed to read model file."));
+    reader.readAsArrayBuffer(file);
+  });
+};
+
+export default function STLViewer({
+  models,
+  selectedModelId,
+  filamentColor,
+  buildPlate,
+  onAnalysisChange,
+}: STLViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const axesSceneRef = useRef<THREE.Scene | null>(null);
   const axesCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
-  const loadedObjectRef = useRef<THREE.Object3D | null>(null);
+  const modelMapRef = useRef(
+    new Map<string, { object: THREE.Object3D; baseVolumeCm3: number }>()
+  );
   const buildPlateRef = useRef<THREE.Object3D | null>(null);
   const filamentColorRef = useRef(filamentColor);
 
@@ -128,7 +157,9 @@ export default function STLViewer({ file, filamentColor, buildPlate, onModelLoad
       0.1,
       5000
     );
-    camera.position.set(0, 100, 200);
+    camera.up.set(0, 0, 1);
+    camera.position.set(0, -300, 220);
+    camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -139,23 +170,21 @@ export default function STLViewer({ file, filamentColor, buildPlate, onModelLoad
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI / 2;
     controlsRef.current = controls;
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
-    scene.add(ambientLight);
-
+    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
     directionalLight.position.set(12, 18, 10);
     scene.add(directionalLight);
 
-    const buildPlateMesh = createBuildPlate(buildPlate.width, buildPlate.depth);
-    scene.add(buildPlateMesh);
-    buildPlateRef.current = buildPlateMesh;
+    const plate = createBuildPlate(buildPlate.width, buildPlate.depth);
+    scene.add(plate);
+    buildPlateRef.current = plate;
 
     const axesScene = new THREE.Scene();
     axesScene.background = new THREE.Color(0x0f172a);
-    const axesHelper = new THREE.AxesHelper(40);
-    axesScene.add(axesHelper);
+    axesScene.add(new THREE.AxesHelper(40));
     axesSceneRef.current = axesScene;
 
     const axesCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
@@ -168,7 +197,6 @@ export default function STLViewer({ file, filamentColor, buildPlate, onModelLoad
       camera.updateProjectionMatrix();
       renderer.setSize(container.clientWidth, container.clientHeight);
     };
-
     window.addEventListener("resize", resize);
 
     let rafId = 0;
@@ -184,6 +212,7 @@ export default function STLViewer({ file, filamentColor, buildPlate, onModelLoad
       if (axesSceneRef.current && axesCameraRef.current) {
         const inset = Math.floor(Math.min(width, height) * 0.22);
         const padding = 12;
+
         renderer.clearDepth();
         renderer.setScissorTest(true);
         renderer.setScissor(padding, padding, inset, inset);
@@ -213,204 +242,238 @@ export default function STLViewer({ file, filamentColor, buildPlate, onModelLoad
   }, []);
 
   useEffect(() => {
-    if (!sceneRef.current) {
-      return;
-    }
+    if (!sceneRef.current) return;
 
     if (buildPlateRef.current) {
       sceneRef.current.remove(buildPlateRef.current);
-      buildPlateRef.current.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (Array.isArray(child.material)) {
-            child.material.forEach((m) => m.dispose());
-          } else {
-            child.material.dispose();
-          }
-        }
-
-        if (child instanceof THREE.LineSegments) {
-          child.geometry.dispose();
-          if (Array.isArray(child.material)) {
-            child.material.forEach((m) => m.dispose());
-          } else {
-            child.material.dispose();
-          }
-        }
-      });
     }
 
-    const nextPlate = createBuildPlate(buildPlate.width, buildPlate.depth);
-    sceneRef.current.add(nextPlate);
-    buildPlateRef.current = nextPlate;
+    const plate = createBuildPlate(buildPlate.width, buildPlate.depth);
+    sceneRef.current.add(plate);
+    buildPlateRef.current = plate;
   }, [buildPlate.width, buildPlate.depth]);
 
   useEffect(() => {
-    if (!sceneRef.current || !cameraRef.current || !controlsRef.current) {
-      return;
-    }
+    if (!sceneRef.current || !cameraRef.current || !controlsRef.current) return;
 
     const scene = sceneRef.current;
     const camera = cameraRef.current;
     const controls = controlsRef.current;
+    const modelMap = modelMapRef.current;
 
-    const removeLoadedObject = () => {
-      if (loadedObjectRef.current) {
-        scene.remove(loadedObjectRef.current);
-        loadedObjectRef.current = null;
-      }
+    const removeModelById = (id: string) => {
+      const entry = modelMap.get(id);
+      if (!entry) return;
+      scene.remove(entry.object);
+      modelMap.delete(id);
     };
 
-    if (!file) {
-      removeLoadedObject();
+    const nextIds = new Set(models.map((m) => m.id));
+    Array.from(modelMap.keys()).forEach((id) => {
+      if (!nextIds.has(id)) removeModelById(id);
+    });
 
-      camera.position.set(0, 100, 200);
-      camera.lookAt(0, 0, 0);
-      camera.updateProjectionMatrix();
-      controls.target.set(0, 0, 0);
-      controls.update();
-      return;
-    }
+    const applyTransformsAndAnalyze = () => {
+      const halfW = buildPlate.width / 2;
+      const halfD = buildPlate.depth / 2;
 
-    const reader = new FileReader();
+      models.forEach((model) => {
+        const entry = modelMap.get(model.id);
+        if (!entry) return;
 
-    reader.onload = (event) => {
-      try {
-        const result = event.target?.result;
-        if (!(result instanceof ArrayBuffer)) {
-          throw new Error("Invalid model file buffer");
-        }
+        const object = entry.object;
+        object.scale.setScalar(model.scale);
+        object.rotation.set(0, 0, (model.rotationZ * Math.PI) / 180);
+        object.position.set(model.positionX, model.positionY, 0);
+        object.updateMatrixWorld(true);
 
-        const ext = file.name.split(".").pop()?.toLowerCase();
-        let modelObject: THREE.Object3D;
+        const box = new THREE.Box3().setFromObject(object);
+        object.position.z += -box.min.z;
+        object.updateMatrixWorld(true);
 
-        if (ext === "stl") {
-          const stlLoader = new STLLoader();
-          const geometry = stlLoader.parse(result);
-          geometry.computeVertexNormals();
+        const groundedBox = new THREE.Box3().setFromObject(object);
+        const size = groundedBox.getSize(new THREE.Vector3());
+        const minX = -halfW + size.x / 2;
+        const maxX = halfW - size.x / 2;
+        const minY = -halfD + size.y / 2;
+        const maxY = halfD - size.y / 2;
+        object.position.x = THREE.MathUtils.clamp(object.position.x, minX, maxX);
+        object.position.y = THREE.MathUtils.clamp(object.position.y, minY, maxY);
+        object.updateMatrixWorld(true);
 
-          const material = new THREE.MeshStandardMaterial({
-            color: filamentColorRef.current,
-            metalness: 0.15,
-            roughness: 0.65,
-          });
-
-          modelObject = new THREE.Mesh(geometry, material);
-        } else if (ext === "obj") {
-          const text = new TextDecoder().decode(result);
-          const objLoader = new OBJLoader();
-          modelObject = objLoader.parse(text);
-
-          modelObject.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-              child.material = new THREE.MeshStandardMaterial({
-                color: filamentColorRef.current,
-                metalness: 0.15,
-                roughness: 0.65,
-              });
-              child.geometry.computeVertexNormals();
-            }
-          });
-        } else if (ext === "3mf") {
-          const threeMFLoader = new ThreeMFLoader();
-          modelObject = threeMFLoader.parse(result);
-
-          modelObject.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-              child.material = new THREE.MeshStandardMaterial({
-                color: filamentColorRef.current,
-                metalness: 0.15,
-                roughness: 0.65,
-              });
-              child.geometry.computeVertexNormals();
-            }
-          });
-        } else {
-          throw new Error("Unsupported model format");
-        }
-
-        removeLoadedObject();
-
-        const box = new THREE.Box3().setFromObject(modelObject);
-        const center = box.getCenter(new THREE.Vector3());
-        const minY = box.min.y;
-        modelObject.position.x -= center.x;
-        modelObject.position.y -= minY;
-        modelObject.position.z -= center.z;
-
-        scene.add(modelObject);
-        loadedObjectRef.current = modelObject;
-
-        modelObject.updateMatrixWorld(true);
-
-        const size = box.getSize(new THREE.Vector3());
-        let volumeCm3 = 0;
-
-        modelObject.traverse((child) => {
+        object.traverse((child) => {
           if (!(child instanceof THREE.Mesh)) return;
-
-          const geometry = child.geometry;
-          if (!(geometry instanceof THREE.BufferGeometry)) return;
-
-          const worldGeometry = geometry.clone();
-          worldGeometry.applyMatrix4(child.matrixWorld);
-          volumeCm3 += computeGeometryVolumeCm3(worldGeometry);
-          worldGeometry.dispose();
+          const mats = Array.isArray(child.material)
+            ? child.material
+            : [child.material];
+          mats.forEach((mat) => {
+            if ("emissive" in mat) {
+              const std = mat as THREE.MeshStandardMaterial;
+              if (model.id === selectedModelId) {
+                std.emissive.set(0x1f2937);
+                std.emissiveIntensity = 0.35;
+              } else {
+                std.emissive.set(0x000000);
+                std.emissiveIntensity = 0;
+              }
+            }
+          });
         });
+      });
 
-        if (onModelLoaded) {
-          onModelLoaded(volumeCm3, {
-            width: size.x,
-            depth: size.y,
-            height: size.z,
+      const visibleObjects = models
+        .map((m) => modelMap.get(m.id)?.object)
+        .filter((obj): obj is THREE.Object3D => Boolean(obj));
+
+      if (visibleObjects.length === 0) {
+        if (onAnalysisChange) {
+          onAnalysisChange({
+            totalVolumeCm3: 0,
+            dimensionsMm: { width: 0, depth: 0, height: 0 },
           });
         }
-
-        const maxDim = Math.max(size.x, size.y, size.z, 1);
-        const fov = (camera.fov * Math.PI) / 180;
-        const distance = (maxDim / 2) / Math.tan(fov / 2);
-
-        camera.position.set(0, Math.max(maxDim * 0.6, 80), distance * 1.8);
+        camera.position.set(0, -300, 220);
         camera.lookAt(0, 0, 0);
-        camera.updateProjectionMatrix();
-
         controls.target.set(0, 0, 0);
-        controls.update();
-      } catch (error) {
-        console.error("Model parsing error:", error);
-        alert("Failed to process 3D model.");
-      }
-    };
-
-    reader.onerror = () => {
-      alert("Failed to read model file.");
-    };
-
-    reader.readAsArrayBuffer(file);
-  }, [file, onModelLoaded]);
-
-  useEffect(() => {
-    if (!loadedObjectRef.current) {
-      return;
-    }
-
-    loadedObjectRef.current.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) {
         return;
       }
 
-      const applyColor = (material: THREE.Material) => {
-        if ("color" in material) {
-          (material as THREE.MeshStandardMaterial).color.set(filamentColor);
-          material.needsUpdate = true;
-        }
-      };
+      const aggregateBox = new THREE.Box3();
+      visibleObjects.forEach((obj, index) => {
+        const box = new THREE.Box3().setFromObject(obj);
+        if (index === 0) aggregateBox.copy(box);
+        else aggregateBox.union(box);
+      });
 
-      if (Array.isArray(child.material)) {
-        child.material.forEach(applyColor);
-      } else if (child.material) {
-        applyColor(child.material);
+      let totalVolumeCm3 = 0;
+      models.forEach((model) => {
+        const entry = modelMap.get(model.id);
+        if (!entry) return;
+        totalVolumeCm3 += entry.baseVolumeCm3 * Math.pow(model.scale, 3);
+      });
+
+      if (onAnalysisChange) {
+        const size = aggregateBox.getSize(new THREE.Vector3());
+        onAnalysisChange({
+          totalVolumeCm3,
+          dimensionsMm: {
+            width: size.x,
+            depth: size.y,
+            height: size.z,
+          },
+        });
       }
+
+      const size = aggregateBox.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z, 1);
+      const fov = (camera.fov * Math.PI) / 180;
+      const distance = (maxDim / 2) / Math.tan(fov / 2);
+
+      camera.position.set(0, -Math.max(distance * 1.8, 260), Math.max(maxDim * 1.2, 200));
+      camera.lookAt(0, 0, size.z / 2);
+      camera.updateProjectionMatrix();
+      controls.target.set(0, 0, size.z / 2);
+      controls.update();
+    };
+
+    const loadMissingModels = async () => {
+      for (let index = 0; index < models.length; index += 1) {
+        const model = models[index];
+        if (modelMap.has(model.id)) continue;
+
+        try {
+          const buffer = await readFileAsArrayBuffer(model.file);
+          const ext = model.file.name.split(".").pop()?.toLowerCase();
+          let object: THREE.Object3D;
+
+          if (ext === "stl") {
+            const geometry = new STLLoader().parse(buffer);
+            geometry.computeVertexNormals();
+            object = new THREE.Mesh(
+              geometry,
+              new THREE.MeshStandardMaterial({
+                color: filamentColorRef.current,
+                metalness: 0.15,
+                roughness: 0.65,
+              })
+            );
+          } else if (ext === "obj") {
+            const text = new TextDecoder().decode(buffer);
+            object = new OBJLoader().parse(text);
+            object.traverse((child) => {
+              if (child instanceof THREE.Mesh) {
+                child.material = new THREE.MeshStandardMaterial({
+                  color: filamentColorRef.current,
+                  metalness: 0.15,
+                  roughness: 0.65,
+                });
+                child.geometry.computeVertexNormals();
+              }
+            });
+          } else if (ext === "3mf") {
+            object = new ThreeMFLoader().parse(buffer);
+            object.traverse((child) => {
+              if (child instanceof THREE.Mesh) {
+                child.material = new THREE.MeshStandardMaterial({
+                  color: filamentColorRef.current,
+                  metalness: 0.15,
+                  roughness: 0.65,
+                });
+                child.geometry.computeVertexNormals();
+              }
+            });
+          } else {
+            throw new Error("Unsupported model format");
+          }
+
+          object.position.set(index * 25, index * 25, 0);
+          scene.add(object);
+
+          object.updateMatrixWorld(true);
+          let baseVolumeCm3 = 0;
+          object.traverse((child) => {
+            if (!(child instanceof THREE.Mesh)) return;
+            if (!(child.geometry instanceof THREE.BufferGeometry)) return;
+            const worldGeometry = child.geometry.clone();
+            worldGeometry.applyMatrix4(child.matrixWorld);
+            baseVolumeCm3 += computeGeometryVolumeCm3(worldGeometry);
+            worldGeometry.dispose();
+          });
+
+          modelMap.set(model.id, { object, baseVolumeCm3 });
+        } catch (error) {
+          console.error("Model parsing error:", error);
+          alert(`Failed to process model: ${model.name}`);
+        }
+      }
+
+      applyTransformsAndAnalyze();
+    };
+
+    void loadMissingModels();
+    applyTransformsAndAnalyze();
+  }, [models, selectedModelId, buildPlate.width, buildPlate.depth, onAnalysisChange]);
+
+  useEffect(() => {
+    if (modelMapRef.current.size === 0) return;
+
+    modelMapRef.current.forEach(({ object }) => {
+      object.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+
+        const applyColor = (material: THREE.Material) => {
+          if ("color" in material) {
+            (material as THREE.MeshStandardMaterial).color.set(filamentColor);
+            material.needsUpdate = true;
+          }
+        };
+
+        if (Array.isArray(child.material)) {
+          child.material.forEach(applyColor);
+        } else {
+          applyColor(child.material);
+        }
+      });
     });
   }, [filamentColor]);
 

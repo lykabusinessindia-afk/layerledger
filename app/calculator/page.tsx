@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useInstallPrompt } from "@/lib/useInstallPrompt";
 import STLViewer from "@/components/STLViewer";
+import type { ViewerModel } from "@/app/components/STLViewer";
 
 type PrinterOption = {
   name: string;
@@ -50,7 +51,8 @@ export default function Calculator() {
   const [filamentColor, setFilamentColor] = useState("#00ff88");
   const [selectedPrinter, setSelectedPrinter] = useState(PRINTER_OPTIONS[0].name);
 
-  const [modelFile, setModelFile] = useState<File | null>(null);
+  const [models, setModels] = useState<ViewerModel[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [modelVolume, setModelVolume] = useState(0);
   const [estimatedPrintTime, setEstimatedPrintTime] = useState(0);
   const [modelFilamentUsed, setModelFilamentUsed] = useState(0);
@@ -74,21 +76,48 @@ export default function Calculator() {
     return ext === "stl" || ext === "obj" || ext === "3mf";
   };
 
+  const appendModels = (incomingFiles: File[]) => {
+    const supported = incomingFiles.filter(isSupportedModelFile);
+    const rejected = incomingFiles.length - supported.length;
+
+    if (rejected > 0) {
+      alert("Some files were skipped. Only STL, OBJ, and 3MF files are supported.");
+    }
+
+    if (supported.length === 0) {
+      return;
+    }
+
+    const startOffset = models.length;
+    const createdModels: ViewerModel[] = supported.map((file, index) => {
+      const id = `${Date.now()}-${startOffset + index}-${Math.random().toString(36).slice(2, 8)}`;
+      const offset = (startOffset + index) * 25;
+      return {
+        id,
+        name: file.name,
+        file,
+        scale: 1,
+        positionX: offset,
+        positionY: offset,
+        rotationZ: 0,
+      };
+    });
+
+    setModels((prev) => [...prev, ...createdModels]);
+
+    if (!selectedModelId) {
+      setSelectedModelId(createdModels[0].id);
+    }
+  };
+
   const handleUpload = (e: ChangeEvent<HTMLInputElement>) => {
     if (!ownershipConfirmed) {
       setShowOwnershipWarning(true);
       return;
     }
 
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!isSupportedModelFile(file)) {
-      alert("Only STL, OBJ, and 3MF files are supported.");
-      return;
-    }
-
-    setModelFile(file);
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    appendModels(files);
     setShowOwnershipWarning(false);
   };
 
@@ -100,20 +129,14 @@ export default function Calculator() {
       return;
     }
 
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-
-    if (!isSupportedModelFile(file)) {
-      alert("Only STL, OBJ, and 3MF files are supported.");
-      return;
-    }
-
-    setModelFile(file);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    appendModels(files);
     setShowOwnershipWarning(false);
   };
 
   const handleClearModel = () => {
-    setModelFile(null);
+    setModels([]);
+    setSelectedModelId(null);
     setModelVolume(0);
     setEstimatedPrintTime(0);
     setModelFilamentUsed(0);
@@ -127,18 +150,18 @@ export default function Calculator() {
     }
   };
 
-  const handleModelLoaded = useCallback((
-    volumeCm3: number,
-    dimensionsMm: { width: number; depth: number; height: number }
-  ) => {
-    setModelVolume(volumeCm3);
-    setModelDimensions(dimensionsMm);
+  const handleAnalysisChange = useCallback((payload: {
+    totalVolumeCm3: number;
+    dimensionsMm: { width: number; depth: number; height: number };
+  }) => {
+    setModelVolume(payload.totalVolumeCm3);
+    setModelDimensions(payload.dimensionsMm);
 
     const materialDensity = 1.24; // g/cm³ for PLA
-    const modelGrams = volumeCm3 * materialDensity;
+    const modelGrams = payload.totalVolumeCm3 * materialDensity;
 
     // Default support estimation: 15% of model volume
-    const supportVolumeCm3 = volumeCm3 * 0.15;
+    const supportVolumeCm3 = payload.totalVolumeCm3 * 0.15;
     const supportGrams = supportVolumeCm3 * materialDensity;
 
     const totalGrams = modelGrams + supportGrams;
@@ -148,7 +171,7 @@ export default function Calculator() {
     setFilamentUsed(totalGrams.toFixed(2));
 
     // Estimate print time from volume and flow rate (default FDM flow: 12 mm³/s)
-    const volumeMm3 = volumeCm3 * 1000;
+    const volumeMm3 = payload.totalVolumeCm3 * 1000;
     const flowRateMm3PerSecond = 12;
     const estimatedHours = volumeMm3 / flowRateMm3PerSecond / 3600;
     setEstimatedPrintTime(estimatedHours);
@@ -264,6 +287,32 @@ export default function Calculator() {
     modelDimensions.width <= selectedPrinterDetails.buildVolume.width &&
     modelDimensions.depth <= selectedPrinterDetails.buildVolume.depth &&
     modelDimensions.height <= selectedPrinterDetails.buildVolume.height;
+
+  const selectedModel = useMemo(
+    () => models.find((model) => model.id === selectedModelId) ?? null,
+    [models, selectedModelId]
+  );
+
+  const updateSelectedModel = (updater: (current: ViewerModel) => ViewerModel) => {
+    if (!selectedModelId) return;
+
+    const halfW = selectedPrinterDetails.buildVolume.width / 2;
+    const halfD = selectedPrinterDetails.buildVolume.depth / 2;
+
+    setModels((prev) =>
+      prev.map((model) => {
+        if (model.id !== selectedModelId) return model;
+        const next = updater(model);
+        return {
+          ...next,
+          positionX: Math.min(Math.max(next.positionX, -halfW), halfW),
+          positionY: Math.min(Math.max(next.positionY, -halfD), halfD),
+          scale: Math.min(Math.max(next.scale, 0.1), 3),
+          rotationZ: Math.min(Math.max(next.rotationZ, -180), 180),
+        };
+      })
+    );
+  };
 
   useEffect(() => {
     const checkUser = async () => {
@@ -391,13 +440,14 @@ export default function Calculator() {
         {/* 3D MODEL PREVIEW */}
         <div className="mt-8 max-w-4xl mx-auto">
           <STLViewer
-            file={modelFile}
+            models={models}
+            selectedModelId={selectedModelId}
             filamentColor={filamentColor}
             buildPlate={{
               width: selectedPrinterDetails.buildVolume.width,
               depth: selectedPrinterDetails.buildVolume.depth,
             }}
-            onModelLoaded={handleModelLoaded}
+            onAnalysisChange={handleAnalysisChange}
           />
         </div>
 
@@ -449,6 +499,7 @@ export default function Calculator() {
               ref={fileInputRef}
               type="file"
               accept=".stl,.obj,.3mf"
+              multiple
               onChange={handleUpload}
               disabled={!ownershipConfirmed}
             />
@@ -459,6 +510,101 @@ export default function Calculator() {
               Clear Model
             </button>
           </div>
+        </div>
+
+        {/* MODEL LIST AND TRANSFORMS */}
+        <div className="mt-8 bg-gray-900 p-5 rounded-xl max-w-xl mx-auto border border-gray-700">
+          <h3 className="text-lg font-semibold text-green-400 mb-3">Loaded Models</h3>
+
+          {models.length === 0 ? (
+            <p className="text-sm text-gray-400">No models loaded yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {models.map((model) => (
+                <button
+                  key={model.id}
+                  type="button"
+                  onClick={() => setSelectedModelId(model.id)}
+                  className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-all ${
+                    selectedModelId === model.id
+                      ? "border-green-400 bg-green-900/30 text-white"
+                      : "border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700"
+                  }`}
+                >
+                  {model.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selectedModel && (
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Scale ({Math.round(selectedModel.scale * 100)}%)</label>
+                <input
+                  type="range"
+                  min={10}
+                  max={300}
+                  value={Math.round(selectedModel.scale * 100)}
+                  onChange={(e) =>
+                    updateSelectedModel((current) => ({
+                      ...current,
+                      scale: parseInt(e.target.value, 10) / 100,
+                    }))
+                  }
+                  className="w-full"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-gray-300 mb-1">Move X (mm)</label>
+                  <input
+                    type="number"
+                    value={selectedModel.positionX.toFixed(2)}
+                    onChange={(e) =>
+                      updateSelectedModel((current) => ({
+                        ...current,
+                        positionX: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                    className="w-full p-2 rounded bg-gray-800 border border-gray-700"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-300 mb-1">Move Y (mm)</label>
+                  <input
+                    type="number"
+                    value={selectedModel.positionY.toFixed(2)}
+                    onChange={(e) =>
+                      updateSelectedModel((current) => ({
+                        ...current,
+                        positionY: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                    className="w-full p-2 rounded bg-gray-800 border border-gray-700"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Rotate Z ({selectedModel.rotationZ.toFixed(0)} deg)</label>
+                <input
+                  type="range"
+                  min={-180}
+                  max={180}
+                  value={selectedModel.rotationZ}
+                  onChange={(e) =>
+                    updateSelectedModel((current) => ({
+                      ...current,
+                      rotationZ: parseInt(e.target.value, 10),
+                    }))
+                  }
+                  className="w-full"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* FILAMENT COLOR */}
