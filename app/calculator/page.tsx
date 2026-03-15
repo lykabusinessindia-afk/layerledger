@@ -79,17 +79,29 @@ export default function Calculator() {
       loader.load(
         url,
         (object: THREE.Object3D) => {
-          // Assume the object has a mesh child
-          const mesh = object.children?.[0] as THREE.Mesh;
-          if (!mesh || !mesh.geometry) {
-            reject(new Error('No valid geometry found'));
-            return;
-          }
+          try {
+            // Traverse the scene to find the first valid mesh
+            let foundMesh: THREE.Mesh | null = null;
+            object.traverse((child) => {
+              if (child instanceof THREE.Mesh && !foundMesh) {
+                foundMesh = child;
+              }
+            });
 
-          const exporter = new STLExporter();
-          const stlData = exporter.parse(mesh);
-          const stlBuffer = new TextEncoder().encode(stlData);
-          resolve(stlBuffer);
+            if (!foundMesh) {
+              reject(new Error('No valid mesh geometry found in uploaded model.'));
+              return;
+            }
+
+            const mesh: THREE.Mesh = foundMesh;
+
+            const exporter = new STLExporter();
+            const stlData = exporter.parse(mesh);
+            const stlBuffer = new TextEncoder().encode(stlData);
+            resolve(stlBuffer);
+          } catch (error) {
+            reject(error);
+          }
         },
         undefined,
         (error: unknown) => {
@@ -185,7 +197,7 @@ export default function Calculator() {
 
     } catch (error) {
       console.error('File processing error:', error);
-      alert('File processing failed. Please try again.');
+      alert('Failed to process 3D model. Please upload a valid STL, OBJ, or 3MF file.');
     }
   };
 
