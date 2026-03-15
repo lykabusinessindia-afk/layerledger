@@ -5,6 +5,9 @@ import { supabase } from "@/lib/supabase";
 import { useInstallPrompt } from "@/lib/useInstallPrompt";
 import parse from "stl-parser";
 import * as THREE from "three";
+import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
+import { ThreeMFLoader } from "three/examples/jsm/loaders/3MFLoader.js";
 
 export default function Calculator() {
   const router = useRouter();
@@ -53,11 +56,11 @@ export default function Calculator() {
       const url = URL.createObjectURL(file);
       const extension = file.name.split('.').pop()?.toLowerCase();
 
-      let loader: THREE.Loader;
+      let loader: OBJLoader | ThreeMFLoader;
       if (extension === 'obj') {
-        loader = new THREE.OBJLoader();
+        loader = new OBJLoader();
       } else if (extension === '3mf') {
-        loader = new THREE.ThreeMFLoader();
+        loader = new ThreeMFLoader();
       } else {
         reject(new Error('Unsupported format'));
         return;
@@ -73,7 +76,7 @@ export default function Calculator() {
             return;
           }
 
-          const exporter = new THREE.STLExporter();
+          const exporter = new STLExporter();
           const stlBuffer = exporter.parse(mesh.geometry, { binary: true }) as Uint8Array;
           resolve(stlBuffer);
         },
