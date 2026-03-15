@@ -149,6 +149,11 @@ export default function Calculator() {
     profitMargin,
   ]);
 
+  const filamentMeters = useMemo(() => {
+    const filamentUsedNum = parseNumber(filamentUsed);
+    return filamentUsedNum / 2.98;
+  }, [filamentUsed]);
+
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
@@ -311,6 +316,10 @@ export default function Calculator() {
               <span>{filamentUsed || "0.00"}</span>
             </div>
             <div className="flex justify-between">
+              <span>Filament Length (meters)</span>
+              <span>{filamentMeters.toFixed(2)} meters</span>
+            </div>
+            <div className="flex justify-between">
               <span>Filament Cost</span>
               <span>₹ {filamentCost.toFixed(2)}</span>
             </div>
@@ -320,14 +329,6 @@ export default function Calculator() {
         {/* INPUTS */}
         <div className="flex flex-col gap-4 max-w-xl mx-auto mt-10">
 
-          <input
-            type="number"
-            min={0}
-            placeholder="Filament Used (grams)"
-            className="p-3 rounded bg-gray-800"
-            value={filamentUsed}
-            readOnly
-          />
           <input
             type="number"
             min={0}
@@ -342,7 +343,7 @@ export default function Calculator() {
             placeholder="Print Time (hours)"
             className="p-3 rounded bg-gray-800"
             value={printTimeHours}
-            onChange={(e) => setPrintTimeHours(e.target.value.replace(/-/g, ""))}
+            readOnly
           />
           <input
             type="number"
@@ -390,7 +391,7 @@ export default function Calculator() {
             placeholder="Failure Rate %"
             className="p-3 rounded bg-gray-800"
             value={failureRate}
-            onChange={(e) => setFailureRate(e.target.value.replace(/-/g, ""))}
+            readOnly
           />
           <input
             type="number"
@@ -398,7 +399,7 @@ export default function Calculator() {
             placeholder="Profit Margin %"
             className="p-3 rounded bg-gray-800"
             value={profitMargin}
-            onChange={(e) => setProfitMargin(e.target.value.replace(/-/g, ""))}
+            readOnly
           />
           <input
             type="number"
@@ -406,7 +407,7 @@ export default function Calculator() {
             placeholder="GST %"
             className="p-3 rounded bg-gray-800"
             value={gstPercent}
-            onChange={(e) => setGstPercent(e.target.value.replace(/-/g, ""))}
+            readOnly
           />
 
         </div>
