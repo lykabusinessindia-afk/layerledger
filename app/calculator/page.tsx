@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useInstallPrompt } from "@/lib/useInstallPrompt";
 import parse from "stl-parser";
+import * as THREE from "three";
 
 export default function Calculator() {
   const router = useRouter();
@@ -47,19 +48,67 @@ export default function Calculator() {
     return Math.abs(volume) / 1000; // Convert mm³ to cm³
   };
 
-  const handleStlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const loadAndConvertToSTL = (file: File): Promise<Uint8Array> => {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const extension = file.name.split('.').pop()?.toLowerCase();
+
+      let loader: THREE.Loader;
+      if (extension === 'obj') {
+        loader = new THREE.OBJLoader();
+      } else if (extension === '3mf') {
+        loader = new THREE.ThreeMFLoader();
+      } else {
+        reject(new Error('Unsupported format'));
+        return;
+      }
+
+      loader.load(
+        url,
+        (object: THREE.Object3D) => {
+          // Assume the object has a mesh child
+          const mesh = object.children?.[0] as THREE.Mesh;
+          if (!mesh || !mesh.geometry) {
+            reject(new Error('No valid geometry found'));
+            return;
+          }
+
+          const exporter = new THREE.STLExporter();
+          const stlBuffer = exporter.parse(mesh.geometry, { binary: true }) as Uint8Array;
+          resolve(stlBuffer);
+        },
+        undefined,
+        (error: unknown) => {
+          reject(error);
+        }
+      );
+    });
+  };
+
+  const handleModelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const buffer = await file.arrayBuffer();
+    const extension = file.name.split('.').pop()?.toLowerCase();
+
+    let stlBuffer: Uint8Array;
     try {
-      const stl = parse(new Uint8Array(buffer));
+      if (extension === 'stl') {
+        stlBuffer = new Uint8Array(await file.arrayBuffer());
+      } else if (extension === 'obj' || extension === '3mf') {
+        stlBuffer = await loadAndConvertToSTL(file);
+      } else {
+        alert('Unsupported file format. Please upload STL, OBJ, or 3MF.');
+        return;
+      }
+
+      const stl = parse(stlBuffer);
       const volumeCm3 = computeVolume(stl.triangles);
       const density = 1.25; // g/cm³ for PLA
       const grams = volumeCm3 * density;
       setFilamentUsed(grams.toFixed(2));
     } catch {
-      alert("Invalid STL file or parsing error");
+      alert('File conversion failed. Please upload an STL file.');
     }
   };
 
@@ -262,12 +311,12 @@ export default function Calculator() {
         {/* STL UPLOAD */}
         <div className="mt-8 max-w-xl mx-auto">
           <label className="block text-sm font-medium mb-2 text-gray-300">
-            Upload STL File (optional - auto-estimates filament usage)
+            Upload 3D Model (STL, OBJ, 3MF)
           </label>
           <input
             type="file"
-            accept=".stl"
-            onChange={handleStlUpload}
+            accept=".stl,.obj,.3mf"
+            onChange={handleModelUpload}
             className="p-2 rounded bg-gray-800 text-white w-full"
           />
         </div>
