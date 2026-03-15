@@ -60,17 +60,15 @@ export default function HomePageClient() {
   const handleGoogleLogin = async () => {
     setAuthLoading(true);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${siteUrl}/calculator`,
-      },
-    });
+    const oauthPath = "/api/auth/signin/google";
+    const topWindow = window.top;
 
-    if (error) {
-      setAuthLoading(false);
-      alert(error.message);
+    if (topWindow && topWindow !== window.self) {
+      topWindow.location.href = oauthPath;
+      return;
     }
+
+    window.location.href = oauthPath;
   };
 
   const handleLaunchCalculator = async () => {

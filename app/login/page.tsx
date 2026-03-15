@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -56,13 +56,29 @@ export default function Login() {
   };
 
   const handleGoogleLogin = async () => {
-  await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/calculator`,
-    },
-  });
-};
+    const oauthPath = "/api/auth/signin/google";
+    const topWindow = window.top;
+
+    if (topWindow && topWindow !== window.self) {
+      topWindow.location.href = oauthPath;
+      return;
+    }
+
+    window.location.href = oauthPath;
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthProvider = params.get("oauth");
+    if (oauthProvider !== "google") return;
+
+    void supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/calculator`,
+      },
+    });
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white">
