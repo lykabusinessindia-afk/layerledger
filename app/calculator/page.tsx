@@ -3,6 +3,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useInstallPrompt } from "@/lib/useInstallPrompt";
+import parse from "stl-parser";
 
 export default function Calculator() {
   const router = useRouter();
@@ -31,6 +32,35 @@ export default function Calculator() {
   const parseNumber = (value: string) => {
     const parsed = parseFloat(value);
     return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const computeVolume = (triangles: { vertices: [number[], number[], number[]] }[]) => {
+    let volume = 0;
+    for (const triangle of triangles) {
+      const [A, B, C] = triangle.vertices;
+      volume += (1/6) * (
+        A[0] * (B[1] * C[2] - B[2] * C[1]) +
+        A[1] * (B[2] * C[0] - B[0] * C[2]) +
+        A[2] * (B[0] * C[1] - B[1] * C[0])
+      );
+    }
+    return Math.abs(volume) / 1000; // Convert mm³ to cm³
+  };
+
+  const handleStlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const buffer = await file.arrayBuffer();
+    try {
+      const stl = parse(new Uint8Array(buffer));
+      const volumeCm3 = computeVolume(stl.triangles);
+      const density = 1.25; // g/cm³ for PLA
+      const grams = volumeCm3 * density;
+      setFilamentUsed(grams.toFixed(2));
+    } catch {
+      alert("Invalid STL file or parsing error");
+    }
   };
 
   const {
@@ -227,6 +257,19 @@ export default function Calculator() {
               Sign Out
             </button>
           </div>
+        </div>
+
+        {/* STL UPLOAD */}
+        <div className="mt-8 max-w-xl mx-auto">
+          <label className="block text-sm font-medium mb-2 text-gray-300">
+            Upload STL File (optional - auto-estimates filament usage)
+          </label>
+          <input
+            type="file"
+            accept=".stl"
+            onChange={handleStlUpload}
+            className="p-2 rounded bg-gray-800 text-white w-full"
+          />
         </div>
 
         {/* INPUTS */}
