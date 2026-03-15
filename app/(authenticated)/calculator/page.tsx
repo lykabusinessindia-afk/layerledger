@@ -1,7 +1,6 @@
 "use client";
 import { useMemo, useState, useCallback, useRef, useEffect, type ChangeEvent, type DragEvent } from "react";
 import { useInstallPrompt } from "@/lib/useInstallPrompt";
-import { supabase } from "@/lib/supabase";
 import { addSavedPrintJob } from "@/lib/printJobs";
 import STLViewer from "@/components/STLViewer";
 import type { ViewerModel } from "@/components/STLViewer";
@@ -50,7 +49,8 @@ const SPOOL_SIZES = [
   { label: "5kg", grams: 5000 },
 ];
 
-const PRINT_EFFICIENCY = 0.5;
+const INFILL_FACTOR = 0.3;
+const PLA_DENSITY = 1.24;
 const SUPPORT_FACTOR = 0.15;
 
 type MaterialType = "PLA" | "PETG" | "ABS" | "TPU" | "ASA" | "PLA+";
@@ -115,11 +115,6 @@ export default function Calculator() {
 
   const { promptInstall } = useInstallPrompt();
 
-  const [waitlistEmail, setWaitlistEmail] = useState("");
-  const [joining, setJoining] = useState(false);
-
-  const [feedback, setFeedback] = useState("");
-  const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [jobSaveMessage, setJobSaveMessage] = useState("");
 
   const [filamentUsed, setFilamentUsed] = useState("");
@@ -255,8 +250,8 @@ export default function Calculator() {
   );
 
   useEffect(() => {
-    const materialDensity = selectedMaterialConfig.density;
-    const modelGrams = modelVolume * materialDensity * PRINT_EFFICIENCY;
+    const printedVolume = modelVolume * INFILL_FACTOR;
+    const modelGrams = printedVolume * PLA_DENSITY;
     const supportGrams = modelGrams * SUPPORT_FACTOR;
     const totalGrams = modelGrams + supportGrams;
 
@@ -713,53 +708,13 @@ export default function Calculator() {
     window.open("https://www.lyka3dstudio.com", "_blank");
   };
 
-  const handleWaitlist = async () => {
-    if (!waitlistEmail) return alert("Enter email");
-
-    setJoining(true);
-
-    const { error } = await supabase
-      .from("waitlist")
-      .insert([{ email: waitlistEmail }]);
-
-    setJoining(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    alert("You're on the waitlist 🚀");
-    setWaitlistEmail("");
-  };
-
-  const handleFeedbackSubmit = async () => {
-    if (!feedback) return alert("Enter feedback");
-
-    setSubmittingFeedback(true);
-
-    const { error } = await supabase
-      .from("feedback")
-      .insert([{ message: feedback }]);
-
-    setSubmittingFeedback(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    alert("Thanks for feedback 🙌");
-    setFeedback("");
-  };
-
   const analysisCards = [
     {
       label: "Model Volume",
       value: `${modelVolume.toFixed(2)} cm³`,
     },
     {
-      label: "Filament Usage",
+      label: "Estimated Filament Usage",
       value: `${filamentUsed || "0.00"} g`,
     },
     {
@@ -836,14 +791,13 @@ export default function Calculator() {
   ];
 
   return (
-    <div className="layerledger-content space-y-6">
+    <div className="layerledger-content space-y-8">
       <section className="rounded-[28px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl md:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-xs uppercase tracking-[0.25em] text-green-300">Calculator Workspace</p>
-            <h1 className="mt-3 text-3xl font-black tracking-tight md:text-5xl">Professional Print Pricing Dashboard</h1>
-            <p className="mt-4 text-base leading-relaxed text-slate-300 md:text-lg">
-              Use the left panel for uploads and printer setup, the center workspace for model preview, and the right panel for pricing analytics.
+          <div className="max-w-2xl">
+            <h1 className="text-3xl font-black tracking-tight text-white md:text-4xl">3D Print Price Calculator</h1>
+            <p className="mt-3 text-sm leading-relaxed text-slate-300 md:text-base">
+              Upload your model, choose a printer, and get an instant price estimate.
             </p>
           </div>
 
@@ -864,11 +818,28 @@ export default function Calculator() {
         </div>
       </section>
 
-      <section className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)_390px]">
-        <aside className="space-y-6 xl:sticky xl:top-24">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {[
+          "STEP 1 — Upload Model",
+          "STEP 2 — Preview Model",
+          "STEP 3 — Select Printer",
+          "STEP 4 — Price Calculation",
+        ].map((step) => (
+          <div
+            key={step}
+            className="rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300"
+          >
+            {step}
+          </div>
+        ))}
+      </section>
+
+      <section className="grid items-start gap-8 xl:grid-cols-[320px_minmax(0,1fr)_390px]">
+        <aside className="space-y-8 xl:sticky xl:top-24">
           <div className="rounded-[24px] border border-white/10 bg-slate-950/70 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green-300">Step 1 — Upload Model</p>
             <h2 className="text-lg font-semibold text-white">Upload Model</h2>
-            <p className="mt-2 text-sm text-slate-400">Drop STL, OBJ, or 3MF files and manage ownership confirmation.</p>
+            <p className="mt-2 text-sm text-slate-400">Add STL, OBJ, or 3MF files to start your quote.</p>
 
             <label className="mt-4 flex items-start gap-3 text-sm leading-relaxed text-slate-300">
               <input
@@ -954,8 +925,9 @@ export default function Calculator() {
           </div>
 
           <div className="rounded-[24px] border border-white/10 bg-slate-950/70 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green-300">Step 3 — Select Printer</p>
             <h2 className="text-lg font-semibold text-white">Printer Selection</h2>
-            <p className="mt-2 text-sm text-slate-400">Set the target printer and verify model fit against build volume.</p>
+            <p className="mt-2 text-sm text-slate-400">Choose the target machine and verify model fit against its build volume.</p>
 
             <label className="mt-4 block text-sm font-medium text-slate-300">Selected Printer</label>
             <select
@@ -999,10 +971,14 @@ export default function Calculator() {
           </div>
         </aside>
 
-        <div className="space-y-6">
+        <div>
           <div className="rounded-[26px] border border-white/10 bg-slate-950/75 p-4 shadow-[0_0_80px_rgba(34,197,94,0.08)] ring-1 ring-green-500/10 backdrop-blur-xl md:p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white md:text-2xl">3D Workspace Viewer</h2>
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green-300">Step 2 — Preview Model</p>
+                <h2 className="mt-2 text-xl font-semibold text-white md:text-2xl">3D Workspace</h2>
+                <p className="mt-1 text-sm text-slate-400">Review the build plate, adjust the selected model, and manage your file list.</p>
+              </div>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">Build Plate Preview</span>
             </div>
 
@@ -1164,44 +1140,50 @@ export default function Calculator() {
                 onAnalysisChange={handleAnalysisChange}
               />
             </div>
-          </div>
 
-          <div className="rounded-[24px] border border-white/10 bg-slate-950/70 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-            <div className="flex items-center justify-between gap-3">
+            <div className="mt-5 rounded-[20px] border border-white/10 bg-slate-900/55 p-4">
+              <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-semibold text-white">Loaded Models</h3>
               <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-slate-400">{models.length} total</span>
+              </div>
+
+              {models.length === 0 ? (
+                <p className="mt-4 text-sm text-slate-400">No models loaded yet.</p>
+              ) : (
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {models.map((model) => (
+                    <button
+                      key={model.id}
+                      type="button"
+                      onClick={() => setSelectedModelId(model.id)}
+                      className={`w-full rounded-xl border px-3 py-2.5 text-left text-sm transition-all ${
+                        selectedModelId === model.id
+                          ? "border-green-400/40 bg-green-500/10 text-white"
+                          : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                      }`}
+                    >
+                      {model.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {selectedModel ? (
+                <div className="mt-5 border-t border-white/10 pt-4 text-xs text-slate-400">
+                  Use the controls above the viewer to move, rotate, scale, duplicate, or delete the selected model.
+                </div>
+              ) : null}
             </div>
-
-            {models.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-400">No models loaded yet.</p>
-            ) : (
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {models.map((model) => (
-                  <button
-                    key={model.id}
-                    type="button"
-                    onClick={() => setSelectedModelId(model.id)}
-                    className={`w-full rounded-xl border px-3 py-2.5 text-left text-sm transition-all ${
-                      selectedModelId === model.id
-                        ? "border-green-400/40 bg-green-500/10 text-white"
-                        : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
-                    }`}
-                  >
-                    {model.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {selectedModel ? (
-              <div className="mt-5 border-t border-white/10 pt-4 text-xs text-slate-400">
-                Use the floating toolbar above the viewer to move, rotate, scale, duplicate, or delete the selected model.
-              </div>
-            ) : null}
           </div>
         </div>
 
-        <aside className="space-y-6 xl:sticky xl:top-24">
+        <aside className="space-y-8 xl:sticky xl:top-24">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green-300">Step 4 — Price Calculation</p>
+            <h2 className="mt-2 text-lg font-semibold text-white">Analysis & Pricing</h2>
+            <p className="mt-1 text-sm text-slate-400">Review material usage, plate capacity, spool readiness, and the final quote.</p>
+          </div>
+
           <div className="rounded-[24px] border border-white/10 bg-slate-950/70 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
             <h2 className="text-lg font-semibold text-white">Model Analysis</h2>
             <div className="mt-4 space-y-3">
@@ -1475,57 +1457,6 @@ export default function Calculator() {
             </div>
           </div>
         </aside>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-[24px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-          <h2 className="text-2xl font-bold tracking-tight text-white">LayerLedger Pro</h2>
-          <p className="mt-3 text-slate-300">Advanced tools for higher-volume print businesses are on the way. Join the waitlist to hear when they launch.</p>
-
-          <ul className="mt-6 space-y-3 text-sm text-slate-300 md:text-base">
-            <li>STL upload with auto cost detection</li>
-            <li>Bulk order pricing calculator</li>
-            <li>Monthly profit and revenue dashboard</li>
-            <li>Filament inventory and cost tracker</li>
-            <li>GST invoice generator with PDF export</li>
-            <li>Shopify price sync integration</li>
-            <li>Saved project history and export tools</li>
-          </ul>
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <input
-              type="email"
-              placeholder="Enter your email"
-              value={waitlistEmail}
-              onChange={(e) => setWaitlistEmail(e.target.value)}
-              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
-            />
-            <button
-              onClick={handleWaitlist}
-              className="rounded-2xl bg-green-600 px-5 py-3 font-semibold text-white transition-all duration-200 hover:bg-green-500"
-            >
-              {joining ? "Joining..." : "Join Waitlist"}
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-[24px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-          <h3 className="text-2xl font-bold tracking-tight text-white">Share Your Feedback</h3>
-          <p className="mt-3 text-slate-300">Tell us what should improve next in the quoting workflow.</p>
-
-          <textarea
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            className="mt-6 min-h-[140px] w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-white"
-          />
-
-          <button
-            onClick={handleFeedbackSubmit}
-            className="mt-4 w-full rounded-2xl bg-blue-600 px-5 py-3 font-semibold text-white transition-all duration-200 hover:bg-blue-500"
-          >
-            {submittingFeedback ? "Submitting..." : "Submit Feedback"}
-          </button>
-        </div>
       </section>
     </div>
   );
