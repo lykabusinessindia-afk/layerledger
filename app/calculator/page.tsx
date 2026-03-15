@@ -30,6 +30,7 @@ export default function Calculator() {
   const [profitMargin, setProfitMargin] = useState("30");
 
   const [modelFile, setModelFile] = useState<File | null>(null);
+  const [modelVolume, setModelVolume] = useState(0);
 
   const parseNumber = (value: string) => {
     const parsed = parseFloat(value);
@@ -63,8 +64,10 @@ export default function Calculator() {
   };
 
   const handleModelLoaded = useCallback((volumeCm3: number) => {
-    const density = 1.25; // g/cm³ for PLA
-    const grams = volumeCm3 * density;
+    setModelVolume(volumeCm3);
+
+    const materialDensity = 1.24; // g/cm³ for PLA
+    const grams = volumeCm3 * materialDensity;
     setFilamentUsed(grams.toFixed(2));
 
     // Estimate print time
@@ -295,6 +298,25 @@ export default function Calculator() {
           </div>
         </div>
 
+        {/* MODEL ANALYSIS */}
+        <div className="mt-8 bg-gray-900 p-5 rounded-xl max-w-xl mx-auto border border-gray-700">
+          <h3 className="text-lg font-semibold text-green-400 mb-3">Model Analysis</h3>
+          <div className="space-y-2 text-gray-300 text-sm">
+            <div className="flex justify-between">
+              <span>Model Volume (cm³)</span>
+              <span>{modelVolume.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Filament Used (grams)</span>
+              <span>{filamentUsed || "0.00"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Filament Cost</span>
+              <span>₹ {filamentCost.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
         {/* INPUTS */}
         <div className="flex flex-col gap-4 max-w-xl mx-auto mt-10">
 
@@ -304,7 +326,7 @@ export default function Calculator() {
             placeholder="Filament Used (grams)"
             className="p-3 rounded bg-gray-800"
             value={filamentUsed}
-            onChange={(e) => setFilamentUsed(e.target.value.replace(/-/g, ""))}
+            readOnly
           />
           <input
             type="number"
