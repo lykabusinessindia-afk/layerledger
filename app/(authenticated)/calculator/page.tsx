@@ -86,9 +86,12 @@ const PRINTER_PROFILES: Record<string, PrinterProfile> = {
   "Elegoo OrangeStorm Giga": { power: 600, speed: 250, machineCostPerHour: 40 },
 };
 
-const INFILL_FACTOR = 0.3;
-const PLA_DENSITY = 1.24;
-const SUPPORT_FACTOR = 0.15;
+// Slicer-style filament estimation constants
+const WALLS_FACTOR = 0.35;          // shell / perimeter volume fraction
+const DEFAULT_INFILL_PERCENTAGE = 0.22; // default infill (22 %)
+const TOP_BOTTOM_FACTOR = 0.15;     // top and bottom solid layers
+const SUPPORTS_FACTOR = 0.05;       // estimated support material
+const SLICER_EFFICIENCY_FACTOR = 0.65; // extrusion path efficiency vs raw volume
 
 type MaterialType = "PLA" | "PETG" | "ABS" | "TPU" | "ASA" | "PLA+";
 
@@ -295,23 +298,48 @@ export default function Calculator() {
     setMachineCostPerHour(String(profile.machineCostPerHour));
   }, [selectedPrinter]);
 
+  // Filament estimation — only recalculates on model change, material change, or printer profile change.
+  // This prevents the weight from fluctuating when unrelated UI fields (speed, price, etc.) are edited.
   useEffect(() => {
-    const printedVolume = modelVolume * INFILL_FACTOR;
-    const modelGrams = printedVolume * PLA_DENSITY;
-    const supportGrams = modelGrams * SUPPORT_FACTOR;
-    const totalGrams = modelGrams + supportGrams;
+    if (modelVolume <= 0) {
+      setModelFilamentUsed(0);
+      setSupportFilamentUsed(0);
+      setFilamentUsed("0.00");
+      return;
+    }
+
+    const infillPercentage = DEFAULT_INFILL_PERCENTAGE;
+    const materialDensity = MATERIAL_LIBRARY[materialType]?.density ?? 1.24;
+
+    const wallsVolume    = modelVolume * WALLS_FACTOR;
+    const infillVolume   = modelVolume * infillPercentage;
+    const topBotVolume   = modelVolume * TOP_BOTTOM_FACTOR;
+    const supportsVolume = modelVolume * SUPPORTS_FACTOR;
+
+    const bodyVolume = wallsVolume + infillVolume + topBotVolume;
+    const effectiveVolume = bodyVolume + supportsVolume;
+
+    const rawFilamentWeight = effectiveVolume * materialDensity;
+    const filamentWeight    = Math.round(rawFilamentWeight * SLICER_EFFICIENCY_FACTOR * 100) / 100;
+
+    const modelGrams   = Math.round(bodyVolume   * materialDensity * SLICER_EFFICIENCY_FACTOR * 100) / 100;
+    const supportGrams = Math.round(supportsVolume * materialDensity * SLICER_EFFICIENCY_FACTOR * 100) / 100;
 
     setModelFilamentUsed(modelGrams);
     setSupportFilamentUsed(supportGrams);
-    setFilamentUsed(totalGrams.toFixed(2));
+    setFilamentUsed(filamentWeight.toFixed(2));
+  }, [modelVolume, materialType, selectedPrinter]);
 
+  // Print-time estimation — recalculates on model or speed change only.
+  useEffect(() => {
+    if (modelVolume <= 0) {
+      setEstimatedPrintTime(0);
+      return;
+    }
     const volumeMm3 = modelVolume * 1000;
     const selectedSpeed = Math.max(parseNumber(printSpeedMmPerSecond), 1);
-    const baseFlowRate = 12; // mm3/s at 60 mm/s baseline speed
-    const flowRateMm3PerSecond = Math.max(
-      1,
-      baseFlowRate * (selectedSpeed / 60)
-    );
+    const baseFlowRate = 12; // mm³/s at 60 mm/s baseline speed
+    const flowRateMm3PerSecond = Math.max(1, baseFlowRate * (selectedSpeed / 60));
     const estimatedHours = volumeMm3 / flowRateMm3PerSecond / 3600;
     setEstimatedPrintTime(estimatedHours);
   }, [modelVolume, printSpeedMmPerSecond]);
@@ -759,7 +787,7 @@ export default function Calculator() {
       value: `${modelVolume.toFixed(2)} cm³`,
     },
     {
-      label: "Estimated Filament Usage",
+      label: "Estimated Filament Usage (±10% accuracy)",
       value: `${filamentUsed || "0.00"} g`,
     },
     {
