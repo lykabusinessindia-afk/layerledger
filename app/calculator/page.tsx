@@ -100,15 +100,22 @@ export default function Calculator() {
           });
 
           if (!mesh) {
-            throw new Error('No mesh geometry found in uploaded model.');
+            alert('Model does not contain valid mesh geometry.');
+            return;
           }
 
           const exporter = new STLExporter();
           const stlData = exporter.parse(mesh);
           stlBuffer = new TextEncoder().encode(stlData);
         } else if (ext === '3mf') {
-          const loader = new ThreeMFLoader();
-          object = loader.parse(buffer);
+          try {
+            const loader = new ThreeMFLoader();
+            object = loader.parse(buffer);
+          } catch (err) {
+            console.warn('3MF parsing failed', err);
+            alert('This 3MF file format is not supported. Please export as STL.');
+            return;
+          }
 
           // Convert to STL for volume calculation
           let mesh: THREE.Mesh | null = null;
@@ -119,7 +126,8 @@ export default function Calculator() {
           });
 
           if (!mesh) {
-            throw new Error('No mesh geometry found in uploaded model.');
+            alert('Model does not contain valid mesh geometry.');
+            return;
           }
 
           const exporter = new STLExporter();
@@ -128,11 +136,13 @@ export default function Calculator() {
         }
 
         if (!object) {
-          throw new Error('Unsupported model format');
+          alert('Unsupported model format.');
+          return;
         }
 
         if (!stlBuffer) {
-          throw new Error('Failed to generate STL buffer');
+          alert('Failed to generate STL buffer for volume calculation.');
+          return;
         }
 
         // Parse STL for volume calculation
@@ -182,7 +192,7 @@ export default function Calculator() {
         }
       } catch (error) {
         console.error('File processing error:', error);
-        alert('Failed to process 3D model. Please upload a valid STL, OBJ, or 3MF file.');
+        alert('Failed to process 3D model.');
       }
     };
 
