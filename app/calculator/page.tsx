@@ -48,7 +48,7 @@ export default function Calculator() {
     };
     checkUser();
   }, [router]);
-
+  
   const handleInstall = async () => {
     if (!installPrompt) return;
 
