@@ -50,7 +50,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="layerledger-content space-y-6">
       <section className="rounded-[28px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.3)] backdrop-blur-xl md:p-8">
         <p className="text-xs uppercase tracking-[0.24em] text-green-300">Settings</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-4xl">Workspace Defaults</h1>

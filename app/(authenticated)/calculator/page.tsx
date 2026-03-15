@@ -50,6 +50,9 @@ const SPOOL_SIZES = [
   { label: "5kg", grams: 5000 },
 ];
 
+const PRINT_EFFICIENCY = 0.5;
+const SUPPORT_FACTOR = 0.15;
+
 type MaterialType = "PLA" | "PETG" | "ABS" | "TPU" | "ASA" | "PLA+";
 
 const MATERIAL_LIBRARY: Record<
@@ -253,10 +256,8 @@ export default function Calculator() {
 
   useEffect(() => {
     const materialDensity = selectedMaterialConfig.density;
-    const modelGrams = modelVolume * materialDensity;
-
-    const supportVolumeCm3 = modelVolume * 0.15;
-    const supportGrams = supportVolumeCm3 * materialDensity;
+    const modelGrams = modelVolume * materialDensity * PRINT_EFFICIENCY;
+    const supportGrams = modelGrams * SUPPORT_FACTOR;
     const totalGrams = modelGrams + supportGrams;
 
     setModelFilamentUsed(modelGrams);
@@ -835,7 +836,7 @@ export default function Calculator() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="layerledger-content space-y-6">
       <section className="rounded-[28px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl md:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">

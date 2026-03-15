@@ -3,6 +3,29 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --ll-bg: #0f172a;
+  --ll-card-bg: #1e293b;
+  --ll-border: #334155;
+  --ll-text: #f8fafc;
+  --ll-accent: #22c55e;
+}
+
+html.dark,
+html.dark-theme {
+  --ll-bg: #0f172a;
+  --ll-card-bg: #1e293b;
+  --ll-border: #334155;
+  --ll-text: #f8fafc;
+  --ll-accent: #22c55e;
+}
+
+html.light,
+html.light-theme {
+  --ll-bg: #f8fafc;
+  --ll-card-bg: #ffffff;
+  --ll-border: #e2e8f0;
+  --ll-text: #0f172a;
+  --ll-accent: #16a34a;
 }
 
 @theme inline {
@@ -25,20 +48,76 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Keep native dropdown menus readable on dark dashboard surfaces. */
-select {
+.layerledger-dashboard {
+  background-color: var(--ll-bg);
+  color: var(--ll-text);
+}
+
+.layerledger-dashboard .layerledger-content section,
+.layerledger-dashboard .layerledger-content article,
+.layerledger-dashboard .layerledger-content aside,
+.layerledger-dashboard .layerledger-content .rounded-\[24px\],
+.layerledger-dashboard .layerledger-content .rounded-\[26px\],
+.layerledger-dashboard .layerledger-content .rounded-\[28px\] {
+  border-color: var(--ll-border) !important;
+}
+
+.layerledger-dashboard .layerledger-content .bg-slate-950\/70,
+.layerledger-dashboard .layerledger-content .bg-slate-950\/75,
+.layerledger-dashboard .layerledger-content .bg-slate-900\/70,
+.layerledger-dashboard .layerledger-content .bg-slate-900\/80,
+.layerledger-dashboard .layerledger-content .bg-slate-900\/60,
+.layerledger-dashboard .layerledger-content .bg-slate-950\/55,
+.layerledger-dashboard .layerledger-content .bg-black\/20,
+.layerledger-dashboard .layerledger-content .bg-white\/5 {
+  background-color: var(--ll-card-bg) !important;
+}
+
+.layerledger-dashboard.light-theme .layerledger-content .text-white,
+.layerledger-dashboard.light-theme .layerledger-content .text-slate-300,
+.layerledger-dashboard.light-theme .layerledger-content .text-slate-200,
+.layerledger-dashboard.light-theme .layerledger-content .text-slate-400,
+.layerledger-dashboard.light-theme .layerledger-content .text-slate-500 {
+  color: var(--ll-text) !important;
+}
+
+.layerledger-dashboard .layerledger-content input,
+.layerledger-dashboard .layerledger-content textarea,
+.layerledger-dashboard .layerledger-content button,
+.layerledger-dashboard .layerledger-content select {
+  border-color: var(--ll-border);
+}
+
+.layerledger-dashboard.dark-theme select {
   background-color: #0f172a;
   color: #ffffff;
 }
 
-select option {
+.layerledger-dashboard.dark-theme select option {
   background-color: #0f172a;
   color: #ffffff;
 }
 
-select option:hover,
-select option:checked,
-select option:focus {
+.layerledger-dashboard.dark-theme select option:hover,
+.layerledger-dashboard.dark-theme select option:checked,
+.layerledger-dashboard.dark-theme select option:focus {
   background-color: #1e293b;
   color: #ffffff;
+}
+
+.layerledger-dashboard.light-theme select {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.layerledger-dashboard.light-theme select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.layerledger-dashboard.light-theme select option:hover,
+.layerledger-dashboard.light-theme select option:checked,
+.layerledger-dashboard.light-theme select option:focus {
+  background-color: #f1f5f9;
+  color: #0f172a;
 }
