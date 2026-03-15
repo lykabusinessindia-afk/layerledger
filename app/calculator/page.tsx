@@ -393,6 +393,10 @@ export default function Calculator() {
           <STLViewer
             file={modelFile}
             filamentColor={filamentColor}
+            buildPlate={{
+              width: selectedPrinterDetails.buildVolume.width,
+              depth: selectedPrinterDetails.buildVolume.depth,
+            }}
             onModelLoaded={handleModelLoaded}
           />
         </div>

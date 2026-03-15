@@ -10,10 +10,52 @@ import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 type STLViewerProps = {
   file: File | null;
   filamentColor: string;
+  buildPlate: { width: number; depth: number };
   onModelLoaded?: (
     volumeCm3: number,
     dimensionsMm: { width: number; depth: number; height: number }
   ) => void;
+};
+
+const createBuildPlate = (width: number, depth: number) => {
+  const plateGroup = new THREE.Group();
+
+  const plate = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, depth),
+    new THREE.MeshStandardMaterial({
+      color: 0x1f2937,
+      metalness: 0.05,
+      roughness: 0.95,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+    })
+  );
+  plate.rotation.x = -Math.PI / 2;
+  plate.position.y = 0;
+  plateGroup.add(plate);
+
+  const gridSpacing = width <= 250 && depth <= 250 ? 10 : 20;
+  const halfW = width / 2;
+  const halfD = depth / 2;
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x374151 });
+
+  const gridPoints: THREE.Vector3[] = [];
+  for (let x = -halfW; x <= halfW; x += gridSpacing) {
+    gridPoints.push(new THREE.Vector3(x, 0.01, -halfD));
+    gridPoints.push(new THREE.Vector3(x, 0.01, halfD));
+  }
+
+  for (let z = -halfD; z <= halfD; z += gridSpacing) {
+    gridPoints.push(new THREE.Vector3(-halfW, 0.01, z));
+    gridPoints.push(new THREE.Vector3(halfW, 0.01, z));
+  }
+
+  const gridGeometry = new THREE.BufferGeometry().setFromPoints(gridPoints);
+  const gridLines = new THREE.LineSegments(gridGeometry, lineMaterial);
+  plateGroup.add(gridLines);
+
+  return plateGroup;
 };
 
 const computeGeometryVolumeCm3 = (geometry: THREE.BufferGeometry): number => {
@@ -57,12 +99,15 @@ const computeGeometryVolumeCm3 = (geometry: THREE.BufferGeometry): number => {
   return volumeMm3 / 1000;
 };
 
-export default function STLViewer({ file, filamentColor, onModelLoaded }: STLViewerProps) {
+export default function STLViewer({ file, filamentColor, buildPlate, onModelLoaded }: STLViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const axesSceneRef = useRef<THREE.Scene | null>(null);
+  const axesCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const loadedObjectRef = useRef<THREE.Object3D | null>(null);
+  const buildPlateRef = useRef<THREE.Object3D | null>(null);
   const filamentColorRef = useRef(filamentColor);
 
   useEffect(() => {
@@ -103,6 +148,21 @@ export default function STLViewer({ file, filamentColor, onModelLoaded }: STLVie
     directionalLight.position.set(12, 18, 10);
     scene.add(directionalLight);
 
+    const buildPlateMesh = createBuildPlate(buildPlate.width, buildPlate.depth);
+    scene.add(buildPlateMesh);
+    buildPlateRef.current = buildPlateMesh;
+
+    const axesScene = new THREE.Scene();
+    axesScene.background = new THREE.Color(0x0f172a);
+    const axesHelper = new THREE.AxesHelper(40);
+    axesScene.add(axesHelper);
+    axesSceneRef.current = axesScene;
+
+    const axesCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    axesCamera.position.set(0, 0, 80);
+    axesCamera.lookAt(0, 0, 0);
+    axesCameraRef.current = axesCamera;
+
     const resize = () => {
       camera.aspect = container.clientWidth / container.clientHeight;
       camera.updateProjectionMatrix();
@@ -114,7 +174,29 @@ export default function STLViewer({ file, filamentColor, onModelLoaded }: STLVie
     let rafId = 0;
     const renderLoop = () => {
       controls.update();
+
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      renderer.setViewport(0, 0, width, height);
+      renderer.setScissorTest(false);
       renderer.render(scene, camera);
+
+      if (axesSceneRef.current && axesCameraRef.current) {
+        const inset = Math.floor(Math.min(width, height) * 0.22);
+        const padding = 12;
+        renderer.clearDepth();
+        renderer.setScissorTest(true);
+        renderer.setScissor(padding, padding, inset, inset);
+        renderer.setViewport(padding, padding, inset, inset);
+
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        axesCamera.position.copy(dir.multiplyScalar(-80));
+        axesCamera.lookAt(0, 0, 0);
+        renderer.render(axesSceneRef.current, axesCameraRef.current);
+        renderer.setScissorTest(false);
+      }
+
       rafId = requestAnimationFrame(renderLoop);
     };
     renderLoop();
@@ -129,6 +211,39 @@ export default function STLViewer({ file, filamentColor, onModelLoaded }: STLVie
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!sceneRef.current) {
+      return;
+    }
+
+    if (buildPlateRef.current) {
+      sceneRef.current.remove(buildPlateRef.current);
+      buildPlateRef.current.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+
+        if (child instanceof THREE.LineSegments) {
+          child.geometry.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      });
+    }
+
+    const nextPlate = createBuildPlate(buildPlate.width, buildPlate.depth);
+    sceneRef.current.add(nextPlate);
+    buildPlateRef.current = nextPlate;
+  }, [buildPlate.width, buildPlate.depth]);
 
   useEffect(() => {
     if (!sceneRef.current || !cameraRef.current || !controlsRef.current) {
@@ -218,7 +333,10 @@ export default function STLViewer({ file, filamentColor, onModelLoaded }: STLVie
 
         const box = new THREE.Box3().setFromObject(modelObject);
         const center = box.getCenter(new THREE.Vector3());
-        modelObject.position.sub(center);
+        const minY = box.min.y;
+        modelObject.position.x -= center.x;
+        modelObject.position.y -= minY;
+        modelObject.position.z -= center.z;
 
         scene.add(modelObject);
         loadedObjectRef.current = modelObject;
@@ -252,7 +370,7 @@ export default function STLViewer({ file, filamentColor, onModelLoaded }: STLVie
         const fov = (camera.fov * Math.PI) / 180;
         const distance = (maxDim / 2) / Math.tan(fov / 2);
 
-        camera.position.set(0, maxDim * 0.35, distance * 1.8);
+        camera.position.set(0, Math.max(maxDim * 0.6, 80), distance * 1.8);
         camera.lookAt(0, 0, 0);
         camera.updateProjectionMatrix();
 
