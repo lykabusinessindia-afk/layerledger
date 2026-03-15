@@ -1,13 +1,15 @@
 "use client";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useInstallPrompt } from "@/lib/useInstallPrompt";
 import parse from "stl-parser";
 import * as THREE from "three";
+import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
-import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { ThreeMFLoader } from "three/examples/jsm/loaders/3MFLoader.js";
+import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 export default function Calculator() {
   const router = useRouter();
@@ -32,6 +34,14 @@ export default function Calculator() {
   const [failureRate, setFailureRate] = useState("5");
   const [gstPercent, setGstPercent] = useState("0");
   const [profitMargin, setProfitMargin] = useState("30");
+
+  // 3D Preview state
+  const previewRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const [modelLoaded, setModelLoaded] = useState(false);
 
   const parseNumber = (value: string) => {
     const parsed = parseFloat(value);
@@ -96,23 +106,86 @@ export default function Calculator() {
     const extension = file.name.split('.').pop()?.toLowerCase();
 
     let stlBuffer: Uint8Array;
+    let loadedObject: THREE.Object3D;
+
     try {
       if (extension === 'stl') {
-        stlBuffer = new Uint8Array(await file.arrayBuffer());
+        const arrayBuffer = await file.arrayBuffer();
+        stlBuffer = new Uint8Array(arrayBuffer);
+        // Load for preview
+        const loader = new STLLoader();
+        const geometry = loader.parse(arrayBuffer);
+        const material = new THREE.MeshLambertMaterial({ color: 0x00ff88 });
+        loadedObject = new THREE.Mesh(geometry, material);
       } else if (extension === 'obj' || extension === '3mf') {
         stlBuffer = await loadAndConvertToSTL(file);
+        // Load for preview
+        const url = URL.createObjectURL(file);
+        if (extension === 'obj') {
+          const loader = new OBJLoader();
+          loadedObject = await new Promise((resolve, reject) => {
+            loader.load(url, resolve, undefined, reject);
+          });
+        } else {
+          const loader = new ThreeMFLoader();
+          loadedObject = await new Promise((resolve, reject) => {
+            loader.load(url, resolve, undefined, reject);
+          });
+        }
       } else {
         alert('Unsupported file format. Please upload STL, OBJ, or 3MF.');
         return;
       }
 
+      // Parse STL for volume calculation
       const stl = parse(stlBuffer);
       const volumeCm3 = computeVolume(stl.triangles);
       const density = 1.25; // g/cm³ for PLA
       const grams = volumeCm3 * density;
       setFilamentUsed(grams.toFixed(2));
-    } catch {
-      alert('File conversion failed. Please upload an STL file.');
+
+      // Estimate print time (simple formula: volume / 10 * layer height factor)
+      const layerHeight = 0.2; // mm
+      const printTimeHours = (volumeCm3 / 10) * (0.2 / layerHeight); // Simplified estimation
+      setPrintTimeHours(printTimeHours.toFixed(2));
+
+      // Add to 3D preview
+      if (sceneRef.current && loadedObject) {
+        // Clear previous model
+        sceneRef.current.children.forEach(child => {
+          if (child instanceof THREE.Mesh || child instanceof THREE.Group) {
+            sceneRef.current!.remove(child);
+          }
+        });
+
+        // Add new model
+        sceneRef.current.add(loadedObject);
+
+        // Center and fit camera
+        const box = new THREE.Box3().setFromObject(loadedObject);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+
+        loadedObject.position.sub(center);
+
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = cameraRef.current!.fov * (Math.PI / 180);
+        const cameraDistance = Math.abs(maxDim / Math.sin(fov / 2));
+
+        cameraRef.current!.position.set(0, 0, cameraDistance * 1.5);
+        cameraRef.current!.lookAt(0, 0, 0);
+
+        if (controlsRef.current) {
+          controlsRef.current.reset();
+          controlsRef.current.update();
+        }
+
+        setModelLoaded(true);
+      }
+
+    } catch (error) {
+      console.error('File processing error:', error);
+      alert('File processing failed. Please try again.');
     }
   };
 
@@ -197,6 +270,69 @@ export default function Calculator() {
     };
     checkUser();
   }, [router]);
+
+  // Initialize 3D preview
+  useEffect(() => {
+    if (!previewRef.current) return;
+
+    // Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111111);
+    sceneRef.current = scene;
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(75, previewRef.current.clientWidth / previewRef.current.clientHeight, 0.1, 1000);
+    camera.position.set(0, 0, 5);
+    cameraRef.current = camera;
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(previewRef.current.clientWidth, previewRef.current.clientHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    previewRef.current.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+
+    // Controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controlsRef.current = controls;
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 5, 5);
+    directionalLight.castShadow = true;
+    scene.add(directionalLight);
+
+    // Animation loop
+    const animate = () => {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    // Handle resize
+    const handleResize = () => {
+      if (!previewRef.current) return;
+      camera.aspect = previewRef.current.clientWidth / previewRef.current.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(previewRef.current.clientWidth, previewRef.current.clientHeight);
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (previewRef.current && renderer.domElement) {
+        previewRef.current.removeChild(renderer.domElement);
+      }
+      renderer.dispose();
+    };
+  }, []);
   
   const handleInstall = async () => {
     const accepted = await promptInstall();
@@ -309,6 +445,23 @@ export default function Calculator() {
             >
               Sign Out
             </button>
+          </div>
+        </div>
+
+        {/* 3D MODEL PREVIEW */}
+        <div className="mt-8 max-w-4xl mx-auto">
+          <div className="relative">
+            <div
+              ref={previewRef}
+              id="model-preview"
+              style={{ height: "400px", width: "100%", background: "#111", borderRadius: "10px" }}
+              className="border border-gray-700"
+            />
+            {!modelLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-lg pointer-events-none">
+                Upload a 3D model to preview
+              </div>
+            )}
           </div>
         </div>
 
