@@ -3,7 +3,7 @@ import { useMemo, useState, useCallback, useRef, type ChangeEvent, type DragEven
 import { useInstallPrompt } from "@/lib/useInstallPrompt";
 import { supabase } from "@/lib/supabase";
 import STLViewer from "@/components/STLViewer";
-import type { ViewerModel } from "@/app/components/STLViewer";
+import type { ViewerModel } from "@/components/STLViewer";
 
 type PrinterOption = {
   name: string;
@@ -25,6 +25,8 @@ const PRINTER_OPTIONS: PrinterOption[] = [
 ];
 
 export default function Calculator() {
+  type WorkspaceTool = "move" | "rotate" | "scale";
+
   const { promptInstall } = useInstallPrompt();
 
   const [waitlistEmail, setWaitlistEmail] = useState("");
@@ -49,6 +51,7 @@ export default function Calculator() {
 
   const [models, setModels] = useState<ViewerModel[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<WorkspaceTool>("move");
   const [modelVolume, setModelVolume] = useState(0);
   const [estimatedPrintTime, setEstimatedPrintTime] = useState(0);
   const [modelFilamentUsed, setModelFilamentUsed] = useState(0);
@@ -308,6 +311,42 @@ export default function Calculator() {
         };
       })
     );
+  };
+
+  const duplicateSelectedModel = () => {
+    if (!selectedModel) return;
+
+    const halfW = selectedPrinterDetails.buildVolume.width / 2;
+    const halfD = selectedPrinterDetails.buildVolume.depth / 2;
+    const duplicateId = `${Date.now()}-copy-${Math.random().toString(36).slice(2, 8)}`;
+    const duplicated: ViewerModel = {
+      ...selectedModel,
+      id: duplicateId,
+      name: `${selectedModel.name.replace(/(\.[^.]+)?$/, "")}-copy${selectedModel.name.includes(".") ? selectedModel.name.slice(selectedModel.name.lastIndexOf(".")) : ""}`,
+      positionX: Math.min(Math.max(selectedModel.positionX + 25, -halfW), halfW),
+      positionY: Math.min(Math.max(selectedModel.positionY + 25, -halfD), halfD),
+    };
+
+    setModels((prev) => [...prev, duplicated]);
+    setSelectedModelId(duplicateId);
+  };
+
+  const deleteSelectedModel = () => {
+    if (!selectedModelId) return;
+
+    setModels((prev) => {
+      const index = prev.findIndex((m) => m.id === selectedModelId);
+      const next = prev.filter((m) => m.id !== selectedModelId);
+
+      if (next.length === 0) {
+        setSelectedModelId(null);
+      } else {
+        const fallbackIndex = Math.min(index, next.length - 1);
+        setSelectedModelId(next[fallbackIndex].id);
+      }
+
+      return next;
+    });
   };
 
   const handleInstall = async () => {
@@ -611,6 +650,127 @@ export default function Calculator() {
               <h2 className="text-xl font-semibold text-white md:text-2xl">3D Workspace Viewer</h2>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">Build Plate Preview</span>
             </div>
+
+            <div className="mb-4 rounded-2xl border border-white/10 bg-slate-900/70 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.25)]">
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { key: "move", label: "Move" },
+                  { key: "rotate", label: "Rotate" },
+                  { key: "scale", label: "Scale" },
+                ].map((tool) => (
+                  <button
+                    key={tool.key}
+                    type="button"
+                    onClick={() => setActiveTool(tool.key as WorkspaceTool)}
+                    className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${
+                      activeTool === tool.key
+                        ? "border-green-400/40 bg-green-500/15 text-green-300"
+                        : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+                    }`}
+                  >
+                    {tool.label}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={duplicateSelectedModel}
+                  disabled={!selectedModel}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Duplicate
+                </button>
+
+                <button
+                  type="button"
+                  onClick={deleteSelectedModel}
+                  disabled={!selectedModel}
+                  className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-300 transition-all hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              </div>
+
+              {selectedModel ? (
+                <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3">
+                  <p className="text-xs text-slate-400">Selected: <span className="text-white">{selectedModel.name}</span></p>
+
+                  {activeTool === "move" && (
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="mb-1 block text-xs text-slate-400">Move X (mm)</span>
+                        <input
+                          type="number"
+                          value={selectedModel.positionX.toFixed(2)}
+                          onChange={(e) =>
+                            updateSelectedModel((current) => ({
+                              ...current,
+                              positionX: parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                          className="w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-white"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block text-xs text-slate-400">Move Y (mm)</span>
+                        <input
+                          type="number"
+                          value={selectedModel.positionY.toFixed(2)}
+                          onChange={(e) =>
+                            updateSelectedModel((current) => ({
+                              ...current,
+                              positionY: parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                          className="w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 text-sm text-white"
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  {activeTool === "rotate" && (
+                    <div className="mt-3">
+                      <label className="mb-1 block text-xs text-slate-400">Rotate Z ({selectedModel.rotationZ.toFixed(0)} deg)</label>
+                      <input
+                        type="range"
+                        min={-180}
+                        max={180}
+                        value={selectedModel.rotationZ}
+                        onChange={(e) =>
+                          updateSelectedModel((current) => ({
+                            ...current,
+                            rotationZ: parseInt(e.target.value, 10),
+                          }))
+                        }
+                        className="w-full accent-green-400"
+                      />
+                    </div>
+                  )}
+
+                  {activeTool === "scale" && (
+                    <div className="mt-3">
+                      <label className="mb-1 block text-xs text-slate-400">Scale ({Math.round(selectedModel.scale * 100)}%)</label>
+                      <input
+                        type="range"
+                        min={10}
+                        max={300}
+                        value={Math.round(selectedModel.scale * 100)}
+                        onChange={(e) =>
+                          updateSelectedModel((current) => ({
+                            ...current,
+                            scale: parseInt(e.target.value, 10) / 100,
+                          }))
+                        }
+                        className="w-full accent-green-400"
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-slate-400">Select a model from the list or click one in the viewer to edit it.</p>
+              )}
+            </div>
+
             <div className="rounded-[22px] border border-white/8 bg-slate-900/70 p-3 shadow-[0_0_60px_rgba(34,197,94,0.06)] md:p-4">
               <STLViewer
                 models={models}
@@ -620,6 +780,7 @@ export default function Calculator() {
                   width: selectedPrinterDetails.buildVolume.width,
                   depth: selectedPrinterDetails.buildVolume.depth,
                 }}
+                onSelectModel={setSelectedModelId}
                 onAnalysisChange={handleAnalysisChange}
               />
             </div>
@@ -652,74 +813,11 @@ export default function Calculator() {
               </div>
             )}
 
-            {selectedModel && (
-              <div className="mt-5 space-y-4 border-t border-white/10 pt-5">
-                <div>
-                  <label className="mb-2 block text-sm text-slate-300">Scale ({Math.round(selectedModel.scale * 100)}%)</label>
-                  <input
-                    type="range"
-                    min={10}
-                    max={300}
-                    value={Math.round(selectedModel.scale * 100)}
-                    onChange={(e) =>
-                      updateSelectedModel((current) => ({
-                        ...current,
-                        scale: parseInt(e.target.value, 10) / 100,
-                      }))
-                    }
-                    className="w-full accent-green-400"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-2 block text-sm text-slate-300">Move X (mm)</label>
-                    <input
-                      type="number"
-                      value={selectedModel.positionX.toFixed(2)}
-                      onChange={(e) =>
-                        updateSelectedModel((current) => ({
-                          ...current,
-                          positionX: parseFloat(e.target.value) || 0,
-                        }))
-                      }
-                      className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-sm text-slate-300">Move Y (mm)</label>
-                    <input
-                      type="number"
-                      value={selectedModel.positionY.toFixed(2)}
-                      onChange={(e) =>
-                        updateSelectedModel((current) => ({
-                          ...current,
-                          positionY: parseFloat(e.target.value) || 0,
-                        }))
-                      }
-                      className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-white"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm text-slate-300">Rotate Z ({selectedModel.rotationZ.toFixed(0)} deg)</label>
-                  <input
-                    type="range"
-                    min={-180}
-                    max={180}
-                    value={selectedModel.rotationZ}
-                    onChange={(e) =>
-                      updateSelectedModel((current) => ({
-                        ...current,
-                        rotationZ: parseInt(e.target.value, 10),
-                      }))
-                    }
-                    className="w-full accent-green-400"
-                  />
-                </div>
+            {selectedModel ? (
+              <div className="mt-5 border-t border-white/10 pt-4 text-xs text-slate-400">
+                Use the floating toolbar above the viewer to move, rotate, scale, duplicate, or delete the selected model.
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 

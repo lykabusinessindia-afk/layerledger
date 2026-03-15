@@ -22,6 +22,7 @@ type STLViewerProps = {
   selectedModelId: string | null;
   filamentColor: string;
   buildPlate: { width: number; depth: number };
+  onSelectModel?: (modelId: string | null) => void;
   onAnalysisChange?: (payload: {
     totalVolumeCm3: number;
     dimensionsMm: { width: number; depth: number; height: number };
@@ -125,6 +126,7 @@ export default function STLViewer({
   selectedModelId,
   filamentColor,
   buildPlate,
+  onSelectModel,
   onAnalysisChange,
 }: STLViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -138,10 +140,15 @@ export default function STLViewer({
   );
   const buildPlateRef = useRef<THREE.Object3D | null>(null);
   const filamentColorRef = useRef(filamentColor);
+  const onSelectModelRef = useRef(onSelectModel);
 
   useEffect(() => {
     filamentColorRef.current = filamentColor;
   }, [filamentColor]);
+
+  useEffect(() => {
+    onSelectModelRef.current = onSelectModel;
+  }, [onSelectModel]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -166,6 +173,45 @@ export default function STLViewer({
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    const findModelIdFromObject = (object: THREE.Object3D | null): string | null => {
+      let current: THREE.Object3D | null = object;
+      while (current) {
+        if (typeof current.userData.modelId === "string") {
+          return current.userData.modelId;
+        }
+        current = current.parent;
+      }
+      return null;
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!cameraRef.current) return;
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(pointer, cameraRef.current);
+
+      const clickableObjects: THREE.Object3D[] = [];
+      modelMapRef.current.forEach(({ object }) => {
+        clickableObjects.push(object);
+      });
+
+      const intersections = raycaster.intersectObjects(clickableObjects, true);
+      if (intersections.length === 0) return;
+
+      const selectedId = findModelIdFromObject(intersections[0].object);
+      if (selectedId && onSelectModelRef.current) {
+        onSelectModelRef.current(selectedId);
+      }
+    };
+
+    renderer.domElement.addEventListener("pointerdown", handlePointerDown);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -232,6 +278,7 @@ export default function STLViewer({
 
     return () => {
       window.removeEventListener("resize", resize);
+      renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
       cancelAnimationFrame(rafId);
       controls.dispose();
       renderer.dispose();
@@ -427,6 +474,10 @@ export default function STLViewer({
           }
 
           object.position.set(index * 25, index * 25, 0);
+          object.userData.modelId = model.id;
+          object.traverse((child) => {
+            child.userData.modelId = model.id;
+          });
           scene.add(object);
 
           object.updateMatrixWorld(true);
