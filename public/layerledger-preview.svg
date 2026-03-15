@@ -1,0 +1,62 @@
+<svg width="1400" height="860" viewBox="0 0 1400 860" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="860" rx="32" fill="#030712"/>
+  <rect x="24" y="24" width="1352" height="812" rx="24" fill="#0B1220" stroke="#1F2937"/>
+  <rect x="56" y="56" width="1288" height="68" rx="18" fill="#111827"/>
+  <circle cx="95" cy="90" r="8" fill="#EF4444"/>
+  <circle cx="123" cy="90" r="8" fill="#F59E0B"/>
+  <circle cx="151" cy="90" r="8" fill="#22C55E"/>
+  <text x="188" y="98" fill="#E5E7EB" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Layer<tspan fill="#22C55E">Ledger</tspan> Calculator Preview</text>
+
+  <rect x="56" y="156" width="760" height="460" rx="24" fill="#0F172A" stroke="#1F2937"/>
+  <rect x="90" y="190" width="692" height="392" rx="18" fill="#111827"/>
+  <rect x="124" y="224" width="624" height="324" rx="14" fill="#0B1120" stroke="#1F2937"/>
+
+  <line x1="160" y1="514" x2="712" y2="514" stroke="#374151" stroke-width="2"/>
+  <line x1="160" y1="474" x2="712" y2="474" stroke="#1F2937" stroke-width="1"/>
+  <line x1="160" y1="434" x2="712" y2="434" stroke="#1F2937" stroke-width="1"/>
+  <line x1="160" y1="394" x2="712" y2="394" stroke="#1F2937" stroke-width="1"/>
+  <line x1="160" y1="354" x2="712" y2="354" stroke="#1F2937" stroke-width="1"/>
+  <line x1="160" y1="314" x2="712" y2="314" stroke="#1F2937" stroke-width="1"/>
+  <line x1="160" y1="274" x2="712" y2="274" stroke="#1F2937" stroke-width="1"/>
+  <line x1="200" y1="250" x2="200" y2="514" stroke="#1F2937" stroke-width="1"/>
+  <line x1="260" y1="250" x2="260" y2="514" stroke="#1F2937" stroke-width="1"/>
+  <line x1="320" y1="250" x2="320" y2="514" stroke="#1F2937" stroke-width="1"/>
+  <line x1="380" y1="250" x2="380" y2="514" stroke="#1F2937" stroke-width="1"/>
+  <line x1="440" y1="250" x2="440" y2="514" stroke="#1F2937" stroke-width="1"/>
+  <line x1="500" y1="250" x2="500" y2="514" stroke="#1F2937" stroke-width="1"/>
+  <line x1="560" y1="250" x2="560" y2="514" stroke="#1F2937" stroke-width="1"/>
+  <line x1="620" y1="250" x2="620" y2="514" stroke="#1F2937" stroke-width="1"/>
+  <line x1="680" y1="250" x2="680" y2="514" stroke="#1F2937" stroke-width="1"/>
+
+  <line x1="170" y1="500" x2="210" y2="500" stroke="#EF4444" stroke-width="4" stroke-linecap="round"/>
+  <line x1="170" y1="500" x2="170" y2="458" stroke="#22C55E" stroke-width="4" stroke-linecap="round"/>
+  <line x1="170" y1="500" x2="146" y2="520" stroke="#3B82F6" stroke-width="4" stroke-linecap="round"/>
+
+  <path d="M420 471L520 278L646 454L548 494L420 471Z" fill="#22C55E" fill-opacity="0.95" stroke="#A7F3D0" stroke-width="3"/>
+  <path d="M420 471L548 494L560 430L500 356L420 471Z" fill="#34D399" fill-opacity="0.8"/>
+  <path d="M520 278L646 454L560 430L500 356L520 278Z" fill="#10B981" fill-opacity="0.85"/>
+
+  <rect x="842" y="156" width="502" height="216" rx="24" fill="#111827" stroke="#1F2937"/>
+  <text x="874" y="200" fill="#E5E7EB" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Model Analysis</text>
+  <text x="874" y="244" fill="#9CA3AF" font-family="Arial, Helvetica, sans-serif" font-size="22">Model Volume</text>
+  <text x="1250" y="244" text-anchor="end" fill="#F9FAFB" font-family="Arial, Helvetica, sans-serif" font-size="22">18.42 cm³</text>
+  <text x="874" y="282" fill="#9CA3AF" font-family="Arial, Helvetica, sans-serif" font-size="22">Total Filament Used</text>
+  <text x="1250" y="282" text-anchor="end" fill="#F9FAFB" font-family="Arial, Helvetica, sans-serif" font-size="22">26.28 g</text>
+  <text x="874" y="320" fill="#9CA3AF" font-family="Arial, Helvetica, sans-serif" font-size="22">Dimensions</text>
+  <text x="1250" y="320" text-anchor="end" fill="#F9FAFB" font-family="Arial, Helvetica, sans-serif" font-size="22">35 × 22 × 6 mm</text>
+
+  <rect x="842" y="396" width="502" height="220" rx="24" fill="#0F172A" stroke="#1F2937"/>
+  <text x="874" y="442" fill="#E5E7EB" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Instant Price Quote</text>
+  <text x="874" y="492" fill="#86EFAC" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="800">₹186.40</text>
+  <rect x="874" y="530" width="172" height="44" rx="12" fill="#166534"/>
+  <text x="960" y="558" text-anchor="middle" fill="#F0FDF4" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700">Fits Ender 3</text>
+
+  <rect x="842" y="642" width="502" height="150" rx="24" fill="#111827" stroke="#1F2937"/>
+  <text x="874" y="686" fill="#E5E7EB" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Key Inputs</text>
+  <rect x="874" y="710" width="138" height="44" rx="12" fill="#1F2937"/>
+  <rect x="1028" y="710" width="138" height="44" rx="12" fill="#1F2937"/>
+  <rect x="1182" y="710" width="130" height="44" rx="12" fill="#1F2937"/>
+  <text x="943" y="738" text-anchor="middle" fill="#D1D5DB" font-family="Arial, Helvetica, sans-serif" font-size="18">PLA ₹1200/kg</text>
+  <text x="1097" y="738" text-anchor="middle" fill="#D1D5DB" font-family="Arial, Helvetica, sans-serif" font-size="18">Energy ₹8/kWh</text>
+  <text x="1247" y="738" text-anchor="middle" fill="#D1D5DB" font-family="Arial, Helvetica, sans-serif" font-size="18">Print 0.43h</text>
+</svg>
