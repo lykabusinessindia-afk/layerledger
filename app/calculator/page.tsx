@@ -32,6 +32,8 @@ export default function Calculator() {
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [modelVolume, setModelVolume] = useState(0);
   const [estimatedPrintTime, setEstimatedPrintTime] = useState(0);
+  const [modelFilamentUsed, setModelFilamentUsed] = useState(0);
+  const [supportFilamentUsed, setSupportFilamentUsed] = useState(0);
   const [modelDimensions, setModelDimensions] = useState({
     width: 0,
     depth: 0,
@@ -79,6 +81,8 @@ export default function Calculator() {
     setModelFile(null);
     setModelVolume(0);
     setEstimatedPrintTime(0);
+    setModelFilamentUsed(0);
+    setSupportFilamentUsed(0);
     setModelDimensions({ width: 0, depth: 0, height: 0 });
     setFilamentUsed("0.00");
     setPrintTimeHours("0.00");
@@ -96,8 +100,17 @@ export default function Calculator() {
     setModelDimensions(dimensionsMm);
 
     const materialDensity = 1.24; // g/cm³ for PLA
-    const grams = volumeCm3 * materialDensity;
-    setFilamentUsed(grams.toFixed(2));
+    const modelGrams = volumeCm3 * materialDensity;
+
+    // Default support estimation: 15% of model volume
+    const supportVolumeCm3 = volumeCm3 * 0.15;
+    const supportGrams = supportVolumeCm3 * materialDensity;
+
+    const totalGrams = modelGrams + supportGrams;
+
+    setModelFilamentUsed(modelGrams);
+    setSupportFilamentUsed(supportGrams);
+    setFilamentUsed(totalGrams.toFixed(2));
 
     // Estimate print time from volume and flow rate (default FDM flow: 12 mm³/s)
     const volumeMm3 = volumeCm3 * 1000;
@@ -350,8 +363,16 @@ export default function Calculator() {
               <span>{modelVolume.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Filament Used (grams)</span>
-              <span>{filamentUsed || "0.00"}</span>
+              <span>Filament Used (Model Only)</span>
+              <span>{modelFilamentUsed.toFixed(2)} grams</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Estimated Support Material</span>
+              <span>{supportFilamentUsed.toFixed(2)} grams</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total Filament Used</span>
+              <span>{filamentUsed || "0.00"} grams</span>
             </div>
             <div className="flex justify-between">
               <span>Filament Length (meters)</span>
