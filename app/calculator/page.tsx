@@ -7,7 +7,6 @@ import parse from "stl-parser";
 import * as THREE from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
-import { ThreeMFLoader } from "three/examples/jsm/loaders/3MFLoader.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
@@ -67,8 +66,8 @@ export default function Calculator() {
 
     const ext = file.name.split('.').pop()?.toLowerCase();
 
-    if (!ext || !['stl', 'obj', '3mf'].includes(ext)) {
-      alert('Unsupported file format. Please upload STL, OBJ, or 3MF.');
+    if (!ext || !['stl', 'obj'].includes(ext)) {
+      alert('Unsupported file format. Please upload STL or OBJ.');
       return;
     }
 
@@ -90,32 +89,6 @@ export default function Calculator() {
           const text = new TextDecoder().decode(buffer);
           const loader = new OBJLoader();
           object = loader.parse(text);
-
-          // Convert to STL for volume calculation
-          let mesh: THREE.Mesh | null = null;
-          object.traverse((child) => {
-            if (child instanceof THREE.Mesh && !mesh) {
-              mesh = child;
-            }
-          });
-
-          if (!mesh) {
-            alert('Model does not contain valid mesh geometry.');
-            return;
-          }
-
-          const exporter = new STLExporter();
-          const stlData = exporter.parse(mesh);
-          stlBuffer = new TextEncoder().encode(stlData);
-        } else if (ext === '3mf') {
-          try {
-            const loader = new ThreeMFLoader();
-            object = loader.parse(buffer);
-          } catch (err) {
-            console.warn('3MF parsing failed', err);
-            alert('This 3MF file format is not supported. Please export as STL.');
-            return;
-          }
 
           // Convert to STL for volume calculation
           let mesh: THREE.Mesh | null = null;
@@ -482,11 +455,11 @@ export default function Calculator() {
         {/* STL UPLOAD */}
         <div className="mt-8 max-w-xl mx-auto">
           <label className="block text-sm font-medium mb-2 text-gray-300">
-            Upload 3D Model (STL, OBJ, 3MF)
+            Upload 3D Model (STL, OBJ)
           </label>
           <input
             type="file"
-            accept=".stl,.obj,.3mf"
+            accept=".stl,.obj"
             onChange={handleModelUpload}
             className="p-2 rounded bg-gray-800 text-white w-full"
           />
