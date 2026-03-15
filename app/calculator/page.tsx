@@ -61,144 +61,136 @@ export default function Calculator() {
     return Math.abs(volume) / 1000; // Convert mm³ to cm³
   };
 
-  const loadAndConvertToSTL = (file: File): Promise<Uint8Array> => {
-    return new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      const extension = file.name.split('.').pop()?.toLowerCase();
-
-      let loader: OBJLoader | ThreeMFLoader;
-      if (extension === 'obj') {
-        loader = new OBJLoader();
-      } else if (extension === '3mf') {
-        loader = new ThreeMFLoader();
-      } else {
-        reject(new Error('Unsupported format'));
-        return;
-      }
-
-      loader.load(
-        url,
-        (object: THREE.Object3D) => {
-          try {
-            // Traverse the scene to find the first valid mesh
-            let foundMesh: THREE.Mesh | null = null;
-            object.traverse((child) => {
-              if (child instanceof THREE.Mesh && !foundMesh) {
-                foundMesh = child;
-              }
-            });
-
-            if (!foundMesh) {
-              reject(new Error('No valid mesh geometry found in uploaded model.'));
-              return;
-            }
-
-            const mesh: THREE.Mesh = foundMesh;
-
-            const exporter = new STLExporter();
-            const stlData = exporter.parse(mesh);
-            const stlBuffer = new TextEncoder().encode(stlData);
-            resolve(stlBuffer);
-          } catch (error) {
-            reject(error);
-          }
-        },
-        undefined,
-        (error: unknown) => {
-          reject(error);
-        }
-      );
-    });
-  };
-
   const handleModelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const extension = file.name.split('.').pop()?.toLowerCase();
+    const ext = file.name.split('.').pop()?.toLowerCase();
 
-    let stlBuffer: Uint8Array;
-    let loadedObject: THREE.Object3D;
-
-    try {
-      if (extension === 'stl') {
-        const arrayBuffer = await file.arrayBuffer();
-        stlBuffer = new Uint8Array(arrayBuffer);
-        // Load for preview
-        const loader = new STLLoader();
-        const geometry = loader.parse(arrayBuffer);
-        const material = new THREE.MeshLambertMaterial({ color: 0x00ff88 });
-        loadedObject = new THREE.Mesh(geometry, material);
-      } else if (extension === 'obj' || extension === '3mf') {
-        stlBuffer = await loadAndConvertToSTL(file);
-        // Load for preview
-        const url = URL.createObjectURL(file);
-        if (extension === 'obj') {
-          const loader = new OBJLoader();
-          loadedObject = await new Promise((resolve, reject) => {
-            loader.load(url, resolve, undefined, reject);
-          });
-        } else {
-          const loader = new ThreeMFLoader();
-          loadedObject = await new Promise((resolve, reject) => {
-            loader.load(url, resolve, undefined, reject);
-          });
-        }
-      } else {
-        alert('Unsupported file format. Please upload STL, OBJ, or 3MF.');
-        return;
-      }
-
-      // Parse STL for volume calculation
-      const stl = parse(stlBuffer);
-      const volumeCm3 = computeVolume(stl.triangles);
-      const density = 1.25; // g/cm³ for PLA
-      const grams = volumeCm3 * density;
-      setFilamentUsed(grams.toFixed(2));
-
-      // Estimate print time (simple formula: volume / 10 * layer height factor)
-      const layerHeight = 0.2; // mm
-      const printTimeHours = (volumeCm3 / 10) * (0.2 / layerHeight); // Simplified estimation
-      setPrintTimeHours(printTimeHours.toFixed(2));
-
-      // Add to 3D preview
-      if (sceneRef.current && loadedObject) {
-        // Clear previous model
-        sceneRef.current.children.forEach(child => {
-          if (child instanceof THREE.Mesh || child instanceof THREE.Group) {
-            sceneRef.current!.remove(child);
-          }
-        });
-
-        // Add new model
-        sceneRef.current.add(loadedObject);
-
-        // Center and fit camera
-        const box = new THREE.Box3().setFromObject(loadedObject);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-
-        loadedObject.position.sub(center);
-
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const fov = cameraRef.current!.fov * (Math.PI / 180);
-        const cameraDistance = Math.abs(maxDim / Math.sin(fov / 2));
-
-        cameraRef.current!.position.set(0, 0, cameraDistance * 1.5);
-        cameraRef.current!.lookAt(0, 0, 0);
-
-        if (controlsRef.current) {
-          controlsRef.current.reset();
-          controlsRef.current.update();
-        }
-
-        setModelLoaded(true);
-      }
-
-    } catch (error) {
-      console.error('File processing error:', error);
-      alert('Failed to process 3D model. Please upload a valid STL, OBJ, or 3MF file.');
+    if (!ext || !['stl', 'obj', '3mf'].includes(ext)) {
+      alert('Unsupported file format. Please upload STL, OBJ, or 3MF.');
+      return;
     }
+
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      try {
+        const buffer = event.target?.result as ArrayBuffer;
+        let object: THREE.Object3D | null = null;
+        let stlBuffer: Uint8Array | null = null;
+
+        if (ext === 'stl') {
+          stlBuffer = new Uint8Array(buffer);
+          const loader = new STLLoader();
+          const geometry = loader.parse(buffer);
+          const material = new THREE.MeshStandardMaterial({ color: 0x00ff88 });
+          object = new THREE.Mesh(geometry, material);
+        } else if (ext === 'obj') {
+          const text = new TextDecoder().decode(buffer);
+          const loader = new OBJLoader();
+          object = loader.parse(text);
+
+          // Convert to STL for volume calculation
+          let mesh: THREE.Mesh | null = null;
+          object.traverse((child) => {
+            if (child instanceof THREE.Mesh && !mesh) {
+              mesh = child;
+            }
+          });
+
+          if (!mesh) {
+            throw new Error('No mesh geometry found in uploaded model.');
+          }
+
+          const exporter = new STLExporter();
+          const stlData = exporter.parse(mesh);
+          stlBuffer = new TextEncoder().encode(stlData);
+        } else if (ext === '3mf') {
+          const loader = new ThreeMFLoader();
+          object = loader.parse(buffer);
+
+          // Convert to STL for volume calculation
+          let mesh: THREE.Mesh | null = null;
+          object.traverse((child) => {
+            if (child instanceof THREE.Mesh && !mesh) {
+              mesh = child;
+            }
+          });
+
+          if (!mesh) {
+            throw new Error('No mesh geometry found in uploaded model.');
+          }
+
+          const exporter = new STLExporter();
+          const stlData = exporter.parse(mesh);
+          stlBuffer = new TextEncoder().encode(stlData);
+        }
+
+        if (!object) {
+          throw new Error('Unsupported model format');
+        }
+
+        if (!stlBuffer) {
+          throw new Error('Failed to generate STL buffer');
+        }
+
+        // Parse STL for volume calculation
+        const stl = parse(stlBuffer);
+        const volumeCm3 = computeVolume(stl.triangles);
+        const density = 1.25; // g/cm³ for PLA
+        const grams = volumeCm3 * density;
+        setFilamentUsed(grams.toFixed(2));
+
+        // Estimate print time (simple formula: volume / 10 * layer height factor)
+        const layerHeight = 0.2; // mm
+        const printTimeHours = (volumeCm3 / 10) * (0.2 / layerHeight); // Simplified estimation
+        setPrintTimeHours(printTimeHours.toFixed(2));
+
+        // Add to 3D preview
+        if (sceneRef.current) {
+          // Clear previous model
+          sceneRef.current.children.forEach(child => {
+            if (child instanceof THREE.Mesh || child instanceof THREE.Group) {
+              sceneRef.current!.remove(child);
+            }
+          });
+
+          // Add new model
+          sceneRef.current.add(object);
+
+          // Center and fit camera
+          const box = new THREE.Box3().setFromObject(object);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+
+          object.position.sub(center);
+
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const fov = cameraRef.current!.fov * (Math.PI / 180);
+          const cameraDistance = Math.abs(maxDim / Math.sin(fov / 2));
+
+          cameraRef.current!.position.set(0, 0, cameraDistance * 1.5);
+          cameraRef.current!.lookAt(0, 0, 0);
+
+          if (controlsRef.current) {
+            controlsRef.current.reset();
+            controlsRef.current.update();
+          }
+
+          setModelLoaded(true);
+        }
+      } catch (error) {
+        console.error('File processing error:', error);
+        alert('Failed to process 3D model. Please upload a valid STL, OBJ, or 3MF file.');
+      }
+    };
+
+    reader.onerror = () => {
+      alert('Failed to read model file.');
+    };
+
+    reader.readAsArrayBuffer(file);
   };
 
   const {
