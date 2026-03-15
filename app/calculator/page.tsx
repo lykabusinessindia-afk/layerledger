@@ -67,6 +67,9 @@ export default function Calculator() {
     await supabase.auth.signOut();
     router.push("/");
   };
+  const redirectToLyka = () => {
+  window.open("https://www.lyka3dstudio.com", "_blank");
+};
 
   const handleWaitlist = async () => {
     if (!waitlistEmail) return alert("Enter email");
@@ -234,6 +237,17 @@ export default function Calculator() {
           </div>
 
         </div>
+        {/* ORDER ON LYKA */}
+<div className="mt-8 max-w-xl mx-auto">
+
+  <button
+    onClick={redirectToLyka}
+    className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300 shadow-lg hover:scale-105 hover:shadow-green-500/40"
+  >
+    🛒 Order This Print on LYKA 3D Studio
+  </button>
+
+</div>
 
         {/* COMING SOON */}
         <div className="mt-16 p-8 bg-gray-900 rounded-xl border border-gray-700 max-w-2xl mx-auto shadow-lg">
