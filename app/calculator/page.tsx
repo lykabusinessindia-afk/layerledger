@@ -83,7 +83,12 @@ export default function Calculator() {
           stlBuffer = new Uint8Array(buffer);
           const loader = new STLLoader();
           const geometry = loader.parse(buffer);
-          const material = new THREE.MeshStandardMaterial({ color: 0x00ff88 });
+          geometry.computeVertexNormals();
+          const material = new THREE.MeshStandardMaterial({
+            color: 0x00ff88,
+            metalness: 0.1,
+            roughness: 0.6
+          });
           object = new THREE.Mesh(geometry, material);
         } else if (ext === 'obj') {
           const text = new TextDecoder().decode(buffer);
