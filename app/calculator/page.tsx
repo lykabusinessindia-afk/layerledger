@@ -77,7 +77,8 @@ export default function Calculator() {
           }
 
           const exporter = new STLExporter();
-          const stlBuffer = exporter.parse(mesh.geometry, { binary: true }) as Uint8Array;
+          const stlData = exporter.parse(mesh);
+          const stlBuffer = new TextEncoder().encode(stlData);
           resolve(stlBuffer);
         },
         undefined,
