@@ -49,6 +49,43 @@ const SPOOL_SIZES = [
   { label: "5kg", grams: 5000 },
 ];
 
+type PrinterProfile = {
+  power: number;
+  speed: number;
+  machineCostPerHour: number;
+};
+
+const PRINTER_PROFILES: Record<string, PrinterProfile> = {
+  "Ender 3": { power: 250, speed: 60, machineCostPerHour: 10 },
+  "Ender 3 V3 SE": { power: 260, speed: 80, machineCostPerHour: 10 },
+  "Ender 3 S1": { power: 270, speed: 80, machineCostPerHour: 12 },
+  "Ender 5 Plus": { power: 350, speed: 60, machineCostPerHour: 15 },
+
+  "CR-10": { power: 350, speed: 60, machineCostPerHour: 15 },
+  "CR-10 Smart Pro": { power: 350, speed: 80, machineCostPerHour: 18 },
+
+  "Bambu Lab A1": { power: 350, speed: 200, machineCostPerHour: 20 },
+  "Bambu Lab A1 Mini": { power: 300, speed: 180, machineCostPerHour: 18 },
+  "Bambu Lab P1P": { power: 350, speed: 300, machineCostPerHour: 25 },
+  "Bambu Lab P1S": { power: 350, speed: 300, machineCostPerHour: 25 },
+  "Bambu Lab X1 Carbon": { power: 350, speed: 300, machineCostPerHour: 30 },
+
+  "Prusa MK3S+": { power: 250, speed: 60, machineCostPerHour: 15 },
+  "Prusa MK4": { power: 280, speed: 80, machineCostPerHour: 18 },
+  "Prusa XL": { power: 400, speed: 200, machineCostPerHour: 35 },
+
+  "Creality K1": { power: 400, speed: 300, machineCostPerHour: 25 },
+
+  "Anycubic Kobra 2": { power: 250, speed: 80, machineCostPerHour: 12 },
+  "Anycubic Kobra Max": { power: 400, speed: 80, machineCostPerHour: 20 },
+
+  "Elegoo Neptune 3 Pro": { power: 250, speed: 60, machineCostPerHour: 12 },
+  "Elegoo Neptune 4": { power: 300, speed: 250, machineCostPerHour: 20 },
+  "Elegoo Neptune 4 Max": { power: 400, speed: 250, machineCostPerHour: 25 },
+
+  "Elegoo OrangeStorm Giga": { power: 600, speed: 250, machineCostPerHour: 40 },
+};
+
 const INFILL_FACTOR = 0.3;
 const PLA_DENSITY = 1.24;
 const SUPPORT_FACTOR = 0.15;
@@ -114,17 +151,18 @@ export default function Calculator() {
   type ModelFootprint = { width: number; depth: number; height: number };
 
   const { promptInstall } = useInstallPrompt();
+  const defaultPrinterProfile = PRINTER_PROFILES[PRINTER_OPTIONS[0].name];
 
   const [jobSaveMessage, setJobSaveMessage] = useState("");
 
   const [filamentUsed, setFilamentUsed] = useState("");
-  const [filamentPricePerKg, setFilamentPricePerKg] = useState("0");
-  const [printTimeHours, setPrintTimeHours] = useState("");
-  const [electricityRate, setElectricityRate] = useState("");
-  const [machinePowerWatts, setMachinePowerWatts] = useState("");
-  const [machineCostPerHour, setMachineCostPerHour] = useState("");
-  const [packagingCost, setPackagingCost] = useState("");
-  const [shippingCost, setShippingCost] = useState("");
+  const [filamentPricePerKg, setFilamentPricePerKg] = useState("1200");
+  const [electricityRate, setElectricityRate] = useState("10");
+  const [machinePowerWatts, setMachinePowerWatts] = useState(String(defaultPrinterProfile.power));
+  const [printSpeedMmPerSecond, setPrintSpeedMmPerSecond] = useState(String(defaultPrinterProfile.speed));
+  const [machineCostPerHour, setMachineCostPerHour] = useState(String(defaultPrinterProfile.machineCostPerHour));
+  const [packagingCost, setPackagingCost] = useState("0");
+  const [shippingCost, setShippingCost] = useState("0");
   const [failureRate, setFailureRate] = useState("5");
   const [gstPercent, setGstPercent] = useState("0");
   const [profitMargin, setProfitMargin] = useState("30");
@@ -229,7 +267,6 @@ export default function Calculator() {
     setSupportFilamentUsed(0);
     setModelDimensions({ width: 0, depth: 0, height: 0 });
     setFilamentUsed("0.00");
-    setPrintTimeHours("0.00");
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -250,6 +287,15 @@ export default function Calculator() {
   );
 
   useEffect(() => {
+    const profile = PRINTER_PROFILES[selectedPrinter];
+    if (!profile) return;
+
+    setMachinePowerWatts(String(profile.power));
+    setPrintSpeedMmPerSecond(String(profile.speed));
+    setMachineCostPerHour(String(profile.machineCostPerHour));
+  }, [selectedPrinter]);
+
+  useEffect(() => {
     const printedVolume = modelVolume * INFILL_FACTOR;
     const modelGrams = printedVolume * PLA_DENSITY;
     const supportGrams = modelGrams * SUPPORT_FACTOR;
@@ -260,15 +306,15 @@ export default function Calculator() {
     setFilamentUsed(totalGrams.toFixed(2));
 
     const volumeMm3 = modelVolume * 1000;
+    const selectedSpeed = Math.max(parseNumber(printSpeedMmPerSecond), 1);
     const baseFlowRate = 12; // mm3/s at 60 mm/s baseline speed
     const flowRateMm3PerSecond = Math.max(
       1,
-      baseFlowRate * (selectedMaterialConfig.defaultSpeed / 60)
+      baseFlowRate * (selectedSpeed / 60)
     );
     const estimatedHours = volumeMm3 / flowRateMm3PerSecond / 3600;
     setEstimatedPrintTime(estimatedHours);
-    setPrintTimeHours(estimatedHours.toFixed(2));
-  }, [modelVolume, selectedMaterialConfig]);
+  }, [modelVolume, printSpeedMmPerSecond]);
 
   const handleModelFootprintsChange = useCallback((payload: Record<string, ModelFootprint>) => {
     setModelFootprints(payload);
@@ -287,7 +333,7 @@ export default function Calculator() {
   } = useMemo(() => {
     const filamentUsedNum = parseNumber(filamentUsed);
     const filamentPriceNum = parseNumber(filamentPricePerKg);
-    const printHoursNum = parseNumber(printTimeHours);
+    const printHoursNum = Math.max(estimatedPrintTime, 0);
     const electricityRateNum = parseNumber(electricityRate);
     const machinePowerNum = parseNumber(machinePowerWatts);
     const machineCostPerHourNum = parseNumber(machineCostPerHour);
@@ -304,39 +350,38 @@ export default function Calculator() {
 
     const machineCost = machineCostPerHourNum * printHoursNum;
 
-    const totalCost =
+    const totalProductionCost =
       filamentCost +
       electricityCost +
+      machineCost +
       packagingCostNum +
-      shippingCostNum +
-      machineCost;
+      shippingCostNum;
 
-    const adjustedCost = totalCost * (1 + failureRateNum / 100);
+    const adjustedCost = totalProductionCost * (1 + failureRateNum / 100);
 
-    const baseSellingPrice =
-      adjustedCost + (adjustedCost * profitMarginNum) / 100;
+    const profitAmount = adjustedCost * (profitMarginNum / 100);
+
+    const baseSellingPrice = adjustedCost + profitAmount;
 
     const gstAmount = (baseSellingPrice * gstPercentNum) / 100;
 
-    const sellingPrice = baseSellingPrice + gstAmount;
-
-    const profitAmount = baseSellingPrice - adjustedCost;
+    const finalPrice = baseSellingPrice + gstAmount;
 
     return {
       filamentCost,
       electricityCost,
       machineCost,
-      totalCost,
+      totalCost: totalProductionCost,
       adjustedCost,
       baseSellingPrice,
       gstAmount,
-      sellingPrice,
+      sellingPrice: finalPrice,
       profitAmount,
     };
   }, [
     filamentUsed,
     filamentPricePerKg,
-    printTimeHours,
+    estimatedPrintTime,
     electricityRate,
     machinePowerWatts,
     machineCostPerHour,
@@ -553,7 +598,7 @@ export default function Calculator() {
       modelName: jobLabel,
       material: selectedMaterialConfig.name,
       filamentUsed: Math.max(parseNumber(filamentUsed), 0),
-      estimatedPrintTime: Math.max(parseNumber(printTimeHours), 0),
+      estimatedPrintTime: Math.max(estimatedPrintTime, 0),
       priceQuote: instantPriceQuote,
       printer: selectedPrinter,
       status: "Pending",
@@ -736,7 +781,7 @@ export default function Calculator() {
     },
     {
       label: "Print Time (hours)",
-      value: printTimeHours,
+      value: estimatedPrintTime.toFixed(2),
       readOnly: true,
       onChange: () => undefined,
     },
@@ -751,6 +796,12 @@ export default function Calculator() {
       value: machinePowerWatts,
       readOnly: false,
       onChange: (value: string) => setMachinePowerWatts(value.replace(/-/g, "")),
+    },
+    {
+      label: "Typical Print Speed (mm/s)",
+      value: printSpeedMmPerSecond,
+      readOnly: false,
+      onChange: (value: string) => setPrintSpeedMmPerSecond(value.replace(/-/g, "")),
     },
     {
       label: "Machine Cost Per Hour",
@@ -773,20 +824,20 @@ export default function Calculator() {
     {
       label: "Failure Rate %",
       value: failureRate,
-      readOnly: true,
-      onChange: () => undefined,
+      readOnly: false,
+      onChange: (value: string) => setFailureRate(value.replace(/-/g, "")),
     },
     {
       label: "Profit Margin %",
       value: profitMargin,
-      readOnly: true,
-      onChange: () => undefined,
+      readOnly: false,
+      onChange: (value: string) => setProfitMargin(value.replace(/-/g, "")),
     },
     {
       label: "GST %",
       value: gstPercent,
-      readOnly: true,
-      onChange: () => undefined,
+      readOnly: false,
+      onChange: (value: string) => setGstPercent(value.replace(/-/g, "")),
     },
   ];
 
