@@ -40,11 +40,21 @@ const isSupportedModelFile = (file: File) => {
 
 export type LayerLedgerWidgetProps = {
   className?: string;
+  printerDefault?: string;
+  materialDefault?: string;
+  shop?: string;
+  productId?: string;
 };
 
-export function LayerLedgerWidget({ className = "" }: LayerLedgerWidgetProps) {
-  const [selectedPrinter, setSelectedPrinter] = useState(PRINTER_OPTIONS[0].name);
-  const [selectedMaterial, setSelectedMaterial] = useState<MaterialType>("PLA");
+export function LayerLedgerWidget({
+  className = "",
+  printerDefault,
+  materialDefault,
+  shop,
+  productId,
+}: LayerLedgerWidgetProps) {
+  const [selectedPrinter, setSelectedPrinter] = useState(printerDefault || PRINTER_OPTIONS[0].name);
+  const [selectedMaterial, setSelectedMaterial] = useState<MaterialType>(materialDefault as MaterialType || "PLA");
   const [filamentColor, setFilamentColor] = useState("#22c55e");
 
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
