@@ -1,0 +1,105 @@
+[33mb938fbd[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m feat: add slicer-style filament estimation and stabilize calculation
+[33me862337[m fix: Shopify embedded Google OAuth redirect and dashboard routing
+[33m4725368[m Fix Google OAuth iframe redirect
+[33m5747c5b[m Add Shopify OAuth install and callback routes
+[33m7e54125[m feat: add printer profiles, improve pricing calculator logic, and prepare LayerLedger for Shopify widget integration
+[33md8d4ff9[m feat: add printer profile system with power, speed and machine cost per hour auto-calculation for pricing engine
+[33m72ce424[m Refactor calculator UI layout: improved workflow structure, cleaned dashboard layout, removed outdated LayerLedger Pro section
+[33m60655c3[m Add printer database + dynamic build plate scaling and fix filament usage estimation
+[33m3bb5ece[m Improve 3D viewer and UI: fix dropdown dark mode styling, add dynamic build plate update based on selected printer, and extend printer database
+[33ma552eec[m LayerLedger update: add Shopify cartPayload preparation, widget cart logic, printer list update, and dropdown dark mode fix
+[33m56a3a95[m widget cart payload added
+[33mf38e397[m Fixed calculator route conflict
+[33m81ae6ab[m Fixed import paths
+[33m1ef7393[m Converted LayerLedger to SaaS dashboard layout
+[33m215bcc6[m Premium homepage redesign
+[33m72d5d6f[m Improved LayerLedger homepage
+[33m6f8a13f[m Fixed STLViewer import path
+[33m0c5d55b[m Added XYZ axes and build plate preview
+[33m1fb3bf1[m Added A1 Mini and OrangeStorm Giga printer profiles
+[33mbcb7206[m Added color selector and model dimensions
+[33mb84c4b7[m Added model ownership confirmation
+[33m33b0235[m Added instant price quote and color selector
+[33md582bf4[m Added support material estimation
+[33m8169255[m Added OBJ and 3MF support
+[33ma73729a[m feature update
+[33m43d5970[m update calculator and filament length
+[33m0c86fd2[m update filament auto calculation
+[33m7f55567[m Fix STL viewer import path and stabilize calculator component
+[33m412119a[m stable STL upload + drag drop
+[33m48f8122[m fix robust STL parsing
+[33m2a0af77[m fix STL loader stability
+[33mfd13cad[m remove unstable 3MF support
+[33m965f7b7[m fix safe STL OBJ 3MF upload handling
+[33m38e2197[m fix 3D model upload STL OBJ 3MF
+[33m1a8348d[m fix mesh extraction for STL OBJ 3MF upload
+[33m7042244[m add 3D preview + STL conversion + print time estimation
+[33m606804b[m fix STLExporter TypeScript error
+[33m3ff1677[m fix three.js loader imports
+[33m4c3efec[m added OBJ and 3MF auto conversion to STL
+[33m99d56b5[m fix stl parser types for vercel build
+[33m4440303[m added STL upload feature
+[33ma846ea6[m calculator improvements with copilot
+[33mded9052[m backup before copilot changes
+[33mdfa0366[m added google analytics to layerledger
+[33m96b0af7[m Added LYKA redirect CTA button
+[33m0427d6c[m fix mobile signout duplicate
+[33m255ac39[m fix PWA icons
+[33md530701[m fix install event listner
+[33m95fc26f[m fix install prompt event
+[33md2ab4b2[m added install button hover effect
+[33m43dd053[m added install PAW button
+[33m47aa6ea[m added install PWA button
+[33mc49cf72[m :install button fix
+[33maad190f[m restore previous code
+[33m77d2054[m install button ready
+[33m5dc978e[m fix install button
+[33m6a2b8d0[m fix install button
+[33m2166803[m add hover effect to install button
+[33md849f0a[m fix homepage buttons
+[33mb9fc2c1[m fix install button visibility
+[33mf103834[m final install button update
+[33mbb7c18b[m update install button
+[33m412c4de[m fix pwa icon size
+[33m86d893e[m add install button
+[33m11e8740[m fix pwa manifest and icon
+[33mdfcdacd[m fix icon name
+[33me0f1db2[m fix pwa icon
+[33me9f5ebf[m fix layerledger color theme
+[33m9abefac[m enable PWA install
+[33m64d87a7[m trigger redeploy
+[33mb4d0793[m Remove PWA config
+[33m50a8ac4[m Fix next-pwa turbopack conflict
+[33m4aa9796[m Fix PWA config
+[33mc61778d[m Enable PWA service worker
+[33m5fcb429[m Add PWA icons and manifest
+[33m4e7d1ac[m Improved spacing under calculator button
+[33mc25fe76[m Moved LYKA credit below calculator button
+[33meff3976[m Added LYKA credit on homepage
+[33mf82a60c[m Added LYKA credit
+[33m25df24c[m Added LYKA credit
+[33m989e60f[m Restore Pro feature list
+[33mbfda1b5[m Remove default 0 values from inputs
+[33m690e1d3[m Fix input layout
+[33m5cedf1f[m Simplify failure rate input
+[33mf32d501[m Fix failure rate structure properly
+[33m67547e6[m Restore full calculator page
+[33m36fa131[m Fix calculator file properly
+[33me74469f[m Update calculator subheading styling
+[33mc3215ec[m Update calculator tagline
+[33meddadaa[m Improve mobile layout
+[33ma1dbdc3[m Fix production auth redirect
+[33m0d63dde[m Fixed footer link colors
+[33m2723452[m Improved footer link visibility
+[33m6e0610c[m Added privacy policy and terms pages
+[33m73dce75[m Improved LayerLedger header styling
+[33mae713c8[m Styled Layer white and Ledger green
+[33macdce26[m Added copy final price button
+[33mb91cf30[m Updated calculator layout
+[33m6ed71fe[m Fixed header layout properly
+[33mbfcd479[m Updated Pro waitlist section
+[33m9a39c14[m final feedback section fixed
+[33m7a51a3d[m Removed duplicate feedback section
+[33m80d36ba[m Added feedback section
+[33mf59297a[m Fix launch button navigation
+[33m80bd8fc[m initial commit
