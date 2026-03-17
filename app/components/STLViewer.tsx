@@ -698,14 +698,14 @@ export default function STLViewer({
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
-    controls.maxPolarAngle = Math.PI / 2;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI - 0.05;
     controls.target.set(0, 0, 0);
     controls.minDistance = 120;
     controls.maxDistance = 900;
-    controls.enableRotate = !simpleView;
-    controls.enablePan = !simpleView;
-    controls.enableZoom = !simpleView;
+    controls.enableRotate = true;
+    controls.enablePan = true;
+    controls.enableZoom = true;
     controlsRef.current = controls;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.62));
@@ -765,7 +765,11 @@ export default function STLViewer({
         renderer.setScissor(padding, padding, inset, inset);
         renderer.setViewport(padding, padding, inset, inset);
 
-        if (!axesCameraRef.current) return;
+        if (!axesCameraRef.current) {
+          renderer.setScissorTest(false);
+          rafId = requestAnimationFrame(renderLoop);
+          return;
+        }
 
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
@@ -960,9 +964,19 @@ export default function STLViewer({
         });
       }
 
-      camera.lookAt(0, 0, 0);
+      const size = aggregateBox.getSize(new THREE.Vector3());
+      const center = aggregateBox.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z, 1);
+      const halfFovY = THREE.MathUtils.degToRad(camera.fov / 2);
+      const fitHeightDistance = maxDim / (2 * Math.tan(halfFovY));
+      const fitWidthDistance = fitHeightDistance / Math.max(camera.aspect, 1);
+      const distance = Math.max(fitHeightDistance, fitWidthDistance) * 1.25;
+      const viewDir = CAMERA_HOME.clone().normalize();
+
+      camera.position.copy(center).add(viewDir.multiplyScalar(distance));
+      camera.lookAt(center);
       camera.updateProjectionMatrix();
-      controls.target.set(0, 0, 0);
+      controls.target.copy(center);
       controls.update();
     };
 
