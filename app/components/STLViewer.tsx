@@ -765,10 +765,12 @@ export default function STLViewer({
         renderer.setScissor(padding, padding, inset, inset);
         renderer.setViewport(padding, padding, inset, inset);
 
+        if (!axesCameraRef.current) return;
+
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
-        axesCamera.position.copy(dir.multiplyScalar(-80));
-        axesCamera.lookAt(0, 0, 0);
+        axesCameraRef.current.position.copy(dir.multiplyScalar(-80));
+        axesCameraRef.current.lookAt(0, 0, 0);
         renderer.render(axesSceneRef.current, axesCameraRef.current);
         renderer.setScissorTest(false);
       }
