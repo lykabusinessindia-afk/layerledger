@@ -445,13 +445,25 @@ export default function Calculator() {
         }),
       });
 
-      if (!createProductResponse.ok) {
-        throw new Error("Failed to create Shopify product");
-      }
-
       const productData = (await createProductResponse.json()) as {
+        error?: string;
+        details?: string;
+        status?: number;
         product?: { handle?: string };
       };
+
+      console.log("Create product API response", {
+        httpStatus: createProductResponse.status,
+        body: productData,
+      });
+
+      if (
+        !createProductResponse.ok ||
+        (typeof productData.status === "number" && productData.status >= 400) ||
+        productData.error
+      ) {
+        throw new Error(productData.details || productData.error || "Failed to create Shopify product");
+      }
 
       const handle = productData.product?.handle;
       if (!handle) {
@@ -463,8 +475,9 @@ export default function Calculator() {
         .replace(/\/$/, "");
 
       window.location.href = `${storefrontBase}/products/${handle}`;
-    } catch {
-      setOrderError("Could not create Shopify product. Please try again.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not create Shopify product.";
+      setOrderError(message);
     } finally {
       setIsOrdering(false);
     }
