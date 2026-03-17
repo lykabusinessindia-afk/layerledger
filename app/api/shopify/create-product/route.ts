@@ -92,56 +92,69 @@ export async function POST(request: Request) {
     };
 
     const endpoint = new URL("/admin/api/2024-01/products.json", storeUrl);
-    const shopifyResponse = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "X-Shopify-Access-Token": accessToken,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(payload),
-      cache: "no-store",
+    console.log("Shopify create-product before API call", {
+      endpoint: endpoint.toString(),
+      payload,
     });
 
-    const contentType = shopifyResponse.headers.get("content-type") ?? "";
-    const responseBody = contentType.includes("application/json")
-      ? await shopifyResponse.json()
-      : await shopifyResponse.text();
-
-    console.log("Shopify create-product response", {
-      status: shopifyResponse.status,
-      body: responseBody,
-    });
-
-    if (!shopifyResponse.ok) {
-      const errorMessage =
-        typeof responseBody === "string"
-          ? responseBody
-          : responseBody?.errors
-            ? JSON.stringify(responseBody.errors)
-            : JSON.stringify(responseBody);
-
-      console.error("Shopify create-product API error", {
-        status: shopifyResponse.status,
-        error: errorMessage,
+    try {
+      const shopifyResponse = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(payload),
+        cache: "no-store",
       });
 
+      const responseText = await shopifyResponse.text();
+
+      console.log("Shopify create-product after API call", {
+        status: shopifyResponse.status,
+        body: responseText,
+      });
+
+      if (!shopifyResponse.ok) {
+        console.error("Shopify create-product API error", {
+          status: shopifyResponse.status,
+          details: responseText,
+        });
+
+        return NextResponse.json(
+          {
+            error: "Shopify API failed",
+            status: shopifyResponse.status,
+            details: responseText,
+          },
+          { status: shopifyResponse.status }
+        );
+      }
+
+      try {
+        const responseJson = responseText ? JSON.parse(responseText) : {};
+        return NextResponse.json(responseJson);
+      } catch {
+        return NextResponse.json({ raw: responseText });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown Shopify fetch error";
+      console.error("Shopify create-product fetch error", message);
       return NextResponse.json(
         {
-          error: "Failed to create Shopify product",
-          details: errorMessage,
-          status: shopifyResponse.status,
+          error: "Shopify API failed",
+          status: 500,
+          details: message,
         },
-        { status: shopifyResponse.status }
+        { status: 500 }
       );
     }
-
-    return NextResponse.json(responseBody);
   } catch (error) {
     console.error("Shopify create-product route error", error);
     const message = error instanceof Error ? error.message : "Unknown server error";
     return NextResponse.json(
-      { error: "Failed to create Shopify product", details: message },
+      { error: "Route failed", status: 500, details: message },
       { status: 500 }
     );
   }
