@@ -182,9 +182,6 @@ export default function Calculator() {
   });
   const [ownershipConfirmed, setOwnershipConfirmed] = useState(false);
   const [showOwnershipWarning, setShowOwnershipWarning] = useState(false);
-  const [orderError, setOrderError] = useState("");
-  const [orderConfirmation, setOrderConfirmation] = useState("");
-  const [isOrdering, setIsOrdering] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parseNumber = (value: string) => {
@@ -400,94 +397,8 @@ export default function Calculator() {
     [selectedPrinter]
   );
 
-  const selectedModel = useMemo(
-    () => models.find((model) => model.id === selectedModelId) ?? null,
-    [models, selectedModelId]
-  );
-
-  const handleOrderThisPrint = async () => {
-    if (!selectedModel) {
-      setOrderError("Upload a model before ordering.");
-      return;
-    }
-
-    setOrderError("");
-    setOrderConfirmation("");
-
-    try {
-      setIsOrdering(true);
-
-      const uploadForm = new FormData();
-      uploadForm.append("file", selectedModel.file);
-
-      const uploadResponse = await fetch("/api/upload", {
-        method: "POST",
-        body: uploadForm,
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error("Model upload failed");
-      }
-
-      const uploadData = (await uploadResponse.json()) as { fileUrl: string };
-
-      const selectedColorName =
-        COLOR_OPTIONS.find((option) => option.value === filamentColor)?.name ?? filamentColor;
-
-      const orderResponse = await fetch("/api/shopify-order", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          modelName: selectedModel.name,
-          filamentUsage: `${filamentUsed || "0.00"} g`,
-          printTime: `${estimatedPrintTime.toFixed(2)} hrs`,
-          printer: selectedPrinter,
-          material: `${selectedMaterialConfig.name} / ${selectedColorName}`,
-          modelDimensions: `${modelDimensions.width.toFixed(2)} x ${modelDimensions.depth.toFixed(2)} x ${modelDimensions.height.toFixed(2)} mm`,
-          stlFileUrl: uploadData.fileUrl,
-          estimatedPrice: instantPriceQuote.toFixed(2),
-        }),
-      });
-
-      if (!orderResponse.ok) {
-        throw new Error("Unable to prepare Shopify order");
-      }
-
-      const orderData = (await orderResponse.json()) as {
-        cartAddUrl: string;
-        checkoutUrl: string;
-        payload: { id: number; quantity: number; properties: Record<string, string> };
-      };
-
-      const cartResponse = await fetch(orderData.cartAddUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(orderData.payload),
-        credentials: "include",
-      });
-
-      if (!cartResponse.ok) {
-        throw new Error("Unable to add print to Shopify cart");
-      }
-
-      setOrderConfirmation("Added to cart. Redirecting to checkout...");
-
-      const topWindow = window.top;
-      if (topWindow && topWindow !== window.self) {
-        topWindow.location.href = orderData.checkoutUrl;
-        return;
-      }
-
-      window.location.href = orderData.checkoutUrl;
-    } catch {
-      setOrderError("Could not place order. Please verify Shopify storefront settings and try again.");
-    } finally {
-      setIsOrdering(false);
-    }
+  const handleOrderThisPrint = () => {
+    window.location.href = "https://lyka3dstudio.com/cart/52817266606191:1";
   };
 
   const analysisCards = [
@@ -669,14 +580,10 @@ export default function Calculator() {
         <button
           type="button"
           onClick={handleOrderThisPrint}
-          disabled={!selectedModel || isOrdering}
-          className="mt-6 w-full rounded-2xl bg-gradient-to-r from-green-500 to-emerald-400 px-6 py-4 text-lg font-black text-black shadow-[0_12px_40px_rgba(34,197,94,0.24)] transition-all duration-200 hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-6 w-full rounded-2xl bg-gradient-to-r from-green-500 to-emerald-400 px-6 py-4 text-lg font-black text-black shadow-[0_12px_40px_rgba(34,197,94,0.24)] transition-all duration-200 hover:scale-[1.01]"
         >
-          {isOrdering ? "Processing Order..." : "Order This Print"}
+          Order This Print
         </button>
-
-        {orderConfirmation ? <p className="mt-3 text-sm font-semibold text-emerald-700 dark:text-emerald-300">{orderConfirmation}</p> : null}
-        {orderError ? <p className="mt-3 text-sm font-semibold text-red-600 dark:text-red-400">{orderError}</p> : null}
       </section>
     </div>
   );
