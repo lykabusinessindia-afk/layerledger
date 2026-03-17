@@ -1,5 +1,5 @@
 # LayerLedger
-
+🔗 Live Demo: https://layerledger.vercel.app
 LayerLedger is a smart 3D printing cost calculator designed to help creators and small businesses calculate accurate pricing.
 
 ## 🚀 Features
