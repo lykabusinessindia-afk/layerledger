@@ -182,6 +182,8 @@ export default function Calculator() {
   });
   const [ownershipConfirmed, setOwnershipConfirmed] = useState(false);
   const [showOwnershipWarning, setShowOwnershipWarning] = useState(false);
+  const [orderError, setOrderError] = useState("");
+  const [isOrdering, setIsOrdering] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parseNumber = (value: string) => {
@@ -397,8 +399,75 @@ export default function Calculator() {
     [selectedPrinter]
   );
 
-  const handleOrderThisPrint = () => {
-    window.location.href = "https://lyka3dstudio.com/cart/52817266606191:1";
+  const selectedModel = useMemo(
+    () => models.find((model) => model.id === selectedModelId) ?? null,
+    [models, selectedModelId]
+  );
+
+  const handleOrderThisPrint = async () => {
+    if (!selectedModel) {
+      setOrderError("Upload a model before ordering.");
+      return;
+    }
+
+    try {
+      setIsOrdering(true);
+      setOrderError("");
+
+      const uploadForm = new FormData();
+      uploadForm.append("file", selectedModel.file);
+
+      const uploadResponse = await fetch("/api/upload", {
+        method: "POST",
+        body: uploadForm,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to upload selected model");
+      }
+
+      const uploadData = (await uploadResponse.json()) as { fileUrl: string };
+      const selectedColorName =
+        COLOR_OPTIONS.find((option) => option.value === filamentColor)?.name ?? filamentColor;
+
+      const createProductResponse = await fetch("/api/shopify/create-product", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: `${selectedModel.name} 3D Print`,
+          price: instantPriceQuote.toFixed(2),
+          weight: `${filamentUsed || "0.00"} g`,
+          time: `${estimatedPrintTime.toFixed(2)} hrs`,
+          material: `${selectedMaterialConfig.name} / ${selectedColorName}`,
+          stlUrl: uploadData.fileUrl,
+        }),
+      });
+
+      if (!createProductResponse.ok) {
+        throw new Error("Failed to create Shopify product");
+      }
+
+      const productData = (await createProductResponse.json()) as {
+        product?: { handle?: string };
+      };
+
+      const handle = productData.product?.handle;
+      if (!handle) {
+        throw new Error("Shopify product handle missing from response");
+      }
+
+      const storefrontBase = (process.env.NEXT_PUBLIC_SHOPIFY_STORE ?? "https://lyka3dstudio.com")
+        .trim()
+        .replace(/\/$/, "");
+
+      window.location.href = `${storefrontBase}/products/${handle}`;
+    } catch {
+      setOrderError("Could not create Shopify product. Please try again.");
+    } finally {
+      setIsOrdering(false);
+    }
   };
 
   const analysisCards = [
@@ -580,10 +649,13 @@ export default function Calculator() {
         <button
           type="button"
           onClick={handleOrderThisPrint}
-          className="mt-6 w-full rounded-2xl bg-gradient-to-r from-green-500 to-emerald-400 px-6 py-4 text-lg font-black text-black shadow-[0_12px_40px_rgba(34,197,94,0.24)] transition-all duration-200 hover:scale-[1.01]"
+          disabled={!selectedModel || isOrdering}
+          className="mt-6 w-full rounded-2xl bg-gradient-to-r from-green-500 to-emerald-400 px-6 py-4 text-lg font-black text-black shadow-[0_12px_40px_rgba(34,197,94,0.24)] transition-all duration-200 hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Order This Print
+          {isOrdering ? "Preparing Your Print..." : "Order This Print"}
         </button>
+
+        {orderError ? <p className="mt-3 text-sm font-semibold text-red-600 dark:text-red-400">{orderError}</p> : null}
       </section>
     </div>
   );
