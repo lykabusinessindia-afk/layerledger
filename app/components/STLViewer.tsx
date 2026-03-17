@@ -39,6 +39,9 @@ type ViewerEntry = {
   dimensionSprite: THREE.Sprite;
 };
 
+const BAMBU_A1_PLATE_MM = 256;
+const CAMERA_HOME = new THREE.Vector3(200, 200, 200);
+
 const computeGeometryVolumeCm3 = (geometry: THREE.BufferGeometry): number => {
   const position = geometry.getAttribute("position");
   if (!position) return 0;
@@ -168,24 +171,143 @@ const updateTextSprite = (
   nextMaterial.dispose();
 };
 
+const createPeiTexture = () => {
+  const size = 1024;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return null;
+  }
+
+  context.fillStyle = "#252a33";
+  context.fillRect(0, 0, size, size);
+
+  const cell = 32;
+  context.strokeStyle = "rgba(255,255,255,0.07)";
+  context.lineWidth = 1;
+
+  for (let i = 0; i <= size; i += cell) {
+    context.beginPath();
+    context.moveTo(i + 0.5, 0);
+    context.lineTo(i + 0.5, size);
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(0, i + 0.5);
+    context.lineTo(size, i + 0.5);
+    context.stroke();
+  }
+
+  // Add subtle PEI grain for a more realistic plate surface.
+  const noise = context.createImageData(size, size);
+  for (let i = 0; i < noise.data.length; i += 4) {
+    const value = 20 + Math.floor(Math.random() * 25);
+    noise.data[i] = value;
+    noise.data[i + 1] = value;
+    noise.data[i + 2] = value;
+    noise.data[i + 3] = 20;
+  }
+  context.putImageData(noise, 0, 0);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(8, 8);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
+};
+
+const clampModelWithinPlate = (
+  object: THREE.Object3D,
+  width: number,
+  depth: number
+) => {
+  const rawBox = new THREE.Box3().setFromObject(object);
+  const size = rawBox.getSize(new THREE.Vector3());
+  const halfW = width / 2;
+  const halfD = depth / 2;
+
+  const fitsX = size.x <= width;
+  const fitsY = size.y <= depth;
+
+  if (!fitsX) {
+    object.position.x = 0;
+  } else {
+    const minX = -halfW + size.x / 2;
+    const maxX = halfW - size.x / 2;
+    object.position.x = THREE.MathUtils.clamp(object.position.x, minX, maxX);
+  }
+
+  if (!fitsY) {
+    object.position.y = 0;
+  } else {
+    const minY = -halfD + size.y / 2;
+    const maxY = halfD - size.y / 2;
+    object.position.y = THREE.MathUtils.clamp(object.position.y, minY, maxY);
+  }
+
+  object.updateMatrixWorld(true);
+  return {
+    box: new THREE.Box3().setFromObject(object),
+    fits: fitsX && fitsY,
+  };
+};
+
+const centerAndGroundObject = (object: THREE.Object3D) => {
+  object.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(object);
+  const center = box.getCenter(new THREE.Vector3());
+  object.position.x -= center.x;
+  object.position.y -= center.y;
+  object.position.z -= box.min.z;
+  object.updateMatrixWorld(true);
+};
+
 const createBuildPlate = (width: number, depth: number) => {
   const plateGroup = new THREE.Group();
   const halfW = width / 2;
   const halfD = depth / 2;
 
+  const peiTexture = createPeiTexture();
+
   const plate = new THREE.Mesh(
     new THREE.PlaneGeometry(width, depth),
     new THREE.MeshStandardMaterial({
-      color: 0xf1f5f9,
-      metalness: 0.03,
-      roughness: 0.96,
-      transparent: true,
-      opacity: 0.95,
+      color: 0x2b313b,
+      map: peiTexture,
+      metalness: 0.1,
+      roughness: 0.92,
       side: THREE.DoubleSide,
     })
   );
   plate.position.z = 0;
+  plate.receiveShadow = true;
   plateGroup.add(plate);
+
+  const outline = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.PlaneGeometry(width, depth)),
+    new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.7 })
+  );
+  outline.position.z = 0.06;
+  plateGroup.add(outline);
+
+  const skirt = new THREE.Mesh(
+    new THREE.BoxGeometry(width + 12, depth + 12, 3.5),
+    new THREE.MeshStandardMaterial({
+      color: 0x111827,
+      metalness: 0.2,
+      roughness: 0.8,
+      transparent: true,
+      opacity: 0.95,
+    })
+  );
+  skirt.position.z = -2;
+  skirt.receiveShadow = true;
+  plateGroup.add(skirt);
 
   const minorPoints: THREE.Vector3[] = [];
   const mediumPoints: THREE.Vector3[] = [];
@@ -212,15 +334,15 @@ const createBuildPlate = (width: number, depth: number) => {
 
   const minorLines = new THREE.LineSegments(
     new THREE.BufferGeometry().setFromPoints(minorPoints),
-    new THREE.LineBasicMaterial({ color: 0xd5dde7, transparent: true, opacity: 0.45 })
+    new THREE.LineBasicMaterial({ color: 0xa3acb9, transparent: true, opacity: 0.18 })
   );
   const mediumLines = new THREE.LineSegments(
     new THREE.BufferGeometry().setFromPoints(mediumPoints),
-    new THREE.LineBasicMaterial({ color: 0xc3cedb, transparent: true, opacity: 0.6 })
+    new THREE.LineBasicMaterial({ color: 0xcbd5e1, transparent: true, opacity: 0.25 })
   );
   const majorLines = new THREE.LineSegments(
     new THREE.BufferGeometry().setFromPoints(majorPoints),
-    new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.82 })
+    new THREE.LineBasicMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.35 })
   );
 
   plateGroup.add(minorLines, mediumLines, majorLines);
@@ -248,7 +370,7 @@ const createBuildPlate = (width: number, depth: number) => {
   const centerMarker = new THREE.Group();
   const centerRing = new THREE.Mesh(
     new THREE.RingGeometry(4, 5.5, 32),
-    new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.8, side: THREE.DoubleSide })
+    new THREE.MeshBasicMaterial({ color: 0x86efac, transparent: true, opacity: 0.75, side: THREE.DoubleSide })
   );
   centerRing.rotation.x = Math.PI / 2;
   centerMarker.add(centerRing);
@@ -261,10 +383,18 @@ const createBuildPlate = (width: number, depth: number) => {
   ];
   const markerLines = new THREE.LineSegments(
     new THREE.BufferGeometry().setFromPoints(markerPoints),
-    new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.9 })
+    new THREE.LineBasicMaterial({ color: 0x86efac, transparent: true, opacity: 0.85 })
   );
   centerMarker.add(markerLines);
   plateGroup.add(centerMarker);
+
+  const shadowCatcher = new THREE.Mesh(
+    new THREE.CircleGeometry(Math.max(width, depth) * 0.42, 48),
+    new THREE.ShadowMaterial({ opacity: 0.17 })
+  );
+  shadowCatcher.position.z = 0.01;
+  shadowCatcher.receiveShadow = true;
+  plateGroup.add(shadowCatcher);
 
   return plateGroup;
 };
@@ -341,6 +471,7 @@ export default function STLViewer({
     offsetX: number;
     offsetY: number;
   } | null>(null);
+  const centeredModelIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     filamentColorRef.current = filamentColor;
@@ -362,9 +493,12 @@ export default function STLViewer({
     onModelFootprintsChangeRef.current = onModelFootprintsChange;
   }, [onModelFootprintsChange]);
 
-  const updateBuildPlate = useCallback((width: number, depth: number) => {
+  const updateBuildPlate = useCallback((_width: number, _depth: number) => {
     const scene = sceneRef.current;
     if (!scene) return;
+
+    const plateWidth = BAMBU_A1_PLATE_MM;
+    const plateDepth = BAMBU_A1_PLATE_MM;
 
     if (buildPlateRef.current) {
       scene.remove(buildPlateRef.current);
@@ -385,10 +519,10 @@ export default function STLViewer({
       });
     }
 
-    const plate = createBuildPlate(width, depth);
+    const plate = createBuildPlate(plateWidth, plateDepth);
     scene.add(plate);
     buildPlateRef.current = plate;
-    buildPlateSizeRef.current = { width, depth };
+    buildPlateSizeRef.current = { width: plateWidth, depth: plateDepth };
   }, []);
 
   useEffect(() => {
@@ -406,13 +540,15 @@ export default function STLViewer({
       5000
     );
     camera.up.set(0, 0, 1);
-    camera.position.set(0, -300, 220);
+    camera.position.copy(CAMERA_HOME);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
     const raycaster = new THREE.Raycaster();
@@ -487,28 +623,17 @@ export default function STLViewer({
       if (!entry) return;
 
       const { width, depth } = buildPlateSizeRef.current;
-      const halfW = width / 2;
-      const halfD = depth / 2;
-
-      const size = entry.boundsBox.getSize(new THREE.Vector3());
-      const minX = -halfW + size.x / 2;
-      const maxX = halfW - size.x / 2;
-      const minY = -halfD + size.y / 2;
-      const maxY = halfD - size.y / 2;
 
       const rawX = planePoint.x - offsetX;
       const rawY = planePoint.y - offsetY;
       const snappedX = Math.round(rawX / snapStep) * snapStep;
       const snappedY = Math.round(rawY / snapStep) * snapStep;
 
-      const clampedX = THREE.MathUtils.clamp(snappedX, minX, maxX);
-      const clampedY = THREE.MathUtils.clamp(snappedY, minY, maxY);
-
-      entry.object.position.x = clampedX;
-      entry.object.position.y = clampedY;
+      entry.object.position.x = snappedX;
+      entry.object.position.y = snappedY;
       entry.object.updateMatrixWorld(true);
 
-      const movedBox = new THREE.Box3().setFromObject(entry.object);
+      const { box: movedBox } = clampModelWithinPlate(entry.object, width, depth);
       entry.boundsBox.copy(movedBox);
       entry.boundsHelper.box.copy(movedBox);
       const center = movedBox.getCenter(new THREE.Vector3());
@@ -517,8 +642,8 @@ export default function STLViewer({
       if (onModelPositionChangeRef.current) {
         onModelPositionChangeRef.current({
           modelId,
-          positionX: clampedX,
-          positionY: clampedY,
+          positionX: entry.object.position.x,
+          positionY: entry.object.position.y,
         });
       }
     };
@@ -538,14 +663,26 @@ export default function STLViewer({
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
     controls.maxPolarAngle = Math.PI / 2;
+    controls.target.set(0, 0, 0);
+    controls.minDistance = 120;
+    controls.maxDistance = 900;
     controlsRef.current = controls;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.72));
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    directionalLight.position.set(12, 18, 16);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.12);
+    directionalLight.position.set(190, 160, 260);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.set(2048, 2048);
+    directionalLight.shadow.camera.near = 10;
+    directionalLight.shadow.camera.far = 800;
+    directionalLight.shadow.camera.left = -260;
+    directionalLight.shadow.camera.right = 260;
+    directionalLight.shadow.camera.top = 260;
+    directionalLight.shadow.camera.bottom = -260;
+    directionalLight.shadow.bias = -0.00018;
     scene.add(directionalLight);
-    const fillLight = new THREE.PointLight(0x93c5fd, 0.28, 1200);
-    fillLight.position.set(-220, -180, 180);
+    const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.38);
+    fillLight.position.set(-220, -80, 150);
     scene.add(fillLight);
 
     updateBuildPlate(buildPlate.width, buildPlate.depth);
@@ -642,8 +779,8 @@ export default function STLViewer({
     });
 
     const applyTransformsAndAnalyze = () => {
-      const halfW = buildPlate.width / 2;
-      const halfD = buildPlate.depth / 2;
+      const plateWidth = buildPlateSizeRef.current.width;
+      const plateDepth = buildPlateSizeRef.current.depth;
       const nextFootprints: Record<string, { width: number; depth: number; height: number }> = {};
 
       models.forEach((model) => {
@@ -654,24 +791,26 @@ export default function STLViewer({
         const object = entry.object;
         object.scale.setScalar(model.scale);
         object.rotation.set(0, 0, (model.rotationZ * Math.PI) / 180);
-        object.position.set(model.positionX, model.positionY, 0);
+
+        const shouldAutoCenter =
+          !centeredModelIdsRef.current.has(model.id) &&
+          Math.abs(model.positionX) <= 35 &&
+          Math.abs(model.positionY) <= 35;
+
+        const nextX = shouldAutoCenter ? 0 : model.positionX;
+        const nextY = shouldAutoCenter ? 0 : model.positionY;
+        object.position.set(nextX, nextY, 0);
         object.updateMatrixWorld(true);
 
         const box = new THREE.Box3().setFromObject(object);
         object.position.z += -box.min.z;
         object.updateMatrixWorld(true);
 
-        const groundedBox = new THREE.Box3().setFromObject(object);
-        const size = groundedBox.getSize(new THREE.Vector3());
-        const minX = -halfW + size.x / 2;
-        const maxX = halfW - size.x / 2;
-        const minY = -halfD + size.y / 2;
-        const maxY = halfD - size.y / 2;
-        object.position.x = THREE.MathUtils.clamp(object.position.x, minX, maxX);
-        object.position.y = THREE.MathUtils.clamp(object.position.y, minY, maxY);
-        object.updateMatrixWorld(true);
+        if (shouldAutoCenter) {
+          centeredModelIdsRef.current.add(model.id);
+        }
 
-        const finalBox = new THREE.Box3().setFromObject(object);
+        const { box: finalBox, fits } = clampModelWithinPlate(object, plateWidth, plateDepth);
         entry.boundsBox.copy(finalBox);
         entry.boundsHelper.box.copy(finalBox);
 
@@ -710,7 +849,7 @@ export default function STLViewer({
             if ("emissive" in mat) {
               const std = mat as THREE.MeshStandardMaterial;
               if (model.id === selectedModelId) {
-                std.emissive.set(0x1f2937);
+                std.emissive.set(fits ? 0x1f2937 : 0x7f1d1d);
                 std.emissiveIntensity = draggingModelId === model.id ? 0.5 : 0.35;
               } else {
                 std.emissive.set(0x000000);
@@ -721,7 +860,7 @@ export default function STLViewer({
         });
 
         const boxMaterial = entry.boundsHelper.material as THREE.LineBasicMaterial;
-        boxMaterial.color.set(0x34d399);
+        boxMaterial.color.set(fits ? 0x34d399 : 0xef4444);
         boxMaterial.transparent = true;
         boxMaterial.opacity = draggingModelId === model.id ? 1 : model.id === selectedModelId ? 0.95 : 0.45;
       });
@@ -741,7 +880,7 @@ export default function STLViewer({
             dimensionsMm: { width: 0, depth: 0, height: 0 },
           });
         }
-        camera.position.set(0, -300, 220);
+        camera.position.copy(CAMERA_HOME);
         camera.lookAt(0, 0, 0);
         controls.target.set(0, 0, 0);
         return;
@@ -773,21 +912,14 @@ export default function STLViewer({
         });
       }
 
-      const size = aggregateBox.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z, 1);
-      const fov = (camera.fov * Math.PI) / 180;
-      const distance = (maxDim / 2) / Math.tan(fov / 2);
-
-      camera.position.set(0, -Math.max(distance * 1.8, 260), Math.max(maxDim * 1.2, 200));
-      camera.lookAt(0, 0, size.z / 2);
+      camera.lookAt(0, 0, 0);
       camera.updateProjectionMatrix();
-      controls.target.set(0, 0, size.z / 2);
+      controls.target.set(0, 0, 0);
       controls.update();
     };
 
     const loadMissingModels = async () => {
-      for (let index = 0; index < models.length; index += 1) {
-        const model = models[index];
+      for (const model of models) {
         if (modelMap.has(model.id)) continue;
 
         try {
@@ -835,10 +967,15 @@ export default function STLViewer({
             throw new Error("Unsupported model format");
           }
 
-          object.position.set(index * 25, index * 25, 0);
+          object.position.set(0, 0, 0);
+          centerAndGroundObject(object);
           object.userData.modelId = model.id;
           object.traverse((child) => {
             child.userData.modelId = model.id;
+            if (child instanceof THREE.Mesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
           });
           scene.add(object);
 
