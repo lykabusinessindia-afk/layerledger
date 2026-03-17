@@ -410,23 +410,22 @@ export default function Calculator() {
       return;
     }
 
+    if (!selectedModel.file) {
+      setOrderError("No model file found. Please upload your model again.");
+      return;
+    }
+
     try {
       setIsOrdering(true);
       setOrderError("");
 
-      const uploadForm = new FormData();
-      uploadForm.append("file", selectedModel.file);
-
-      const uploadResponse = await fetch("/api/upload", {
-        method: "POST",
-        body: uploadForm,
+      console.log("Order This Print file check", {
+        hasFile: Boolean(selectedModel.file),
+        fileName: selectedModel.file.name,
+        fileSize: selectedModel.file.size,
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error("Failed to upload selected model");
-      }
-
-      const uploadData = (await uploadResponse.json()) as { fileUrl: string };
+      const stlReferenceUrl = `local-file://${encodeURIComponent(selectedModel.file.name)}`;
       const selectedColorName =
         COLOR_OPTIONS.find((option) => option.value === filamentColor)?.name ?? filamentColor;
 
@@ -441,7 +440,7 @@ export default function Calculator() {
           weight: `${filamentUsed || "0.00"} g`,
           time: `${estimatedPrintTime.toFixed(2)} hrs`,
           material: `${selectedMaterialConfig.name} / ${selectedColorName}`,
-          stlUrl: uploadData.fileUrl,
+          stlUrl: stlReferenceUrl,
         }),
       });
 
