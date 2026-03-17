@@ -267,6 +267,32 @@ const centerAndGroundObject = (object: THREE.Object3D) => {
   object.updateMatrixWorld(true);
 };
 
+const normalizeModelToBuildPlate = (
+  object: THREE.Object3D,
+  buildPlate: { width: number; depth: number }
+) => {
+  object.rotation.set(0, 0, 0);
+  object.position.set(0, 0, 0);
+  object.updateMatrixWorld(true);
+
+  centerAndGroundObject(object);
+
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+
+  const widthScale = size.x > 0 ? (buildPlate.width * 0.96) / size.x : 1;
+  const depthScale = size.y > 0 ? (buildPlate.depth * 0.96) / size.y : 1;
+  const fitScale = Math.min(widthScale, depthScale, 1);
+
+  if (Number.isFinite(fitScale) && fitScale > 0 && fitScale < 1) {
+    object.scale.multiplyScalar(fitScale);
+    object.updateMatrixWorld(true);
+    centerAndGroundObject(object);
+  }
+
+  return new THREE.Box3().setFromObject(object);
+};
+
 const createBuildPlate = (width: number, depth: number) => {
   const plateGroup = new THREE.Group();
   const halfW = width / 2;
@@ -472,6 +498,7 @@ export default function STLViewer({
     offsetY: number;
   } | null>(null);
   const centeredModelIdsRef = useRef(new Set<string>());
+  const normalizedModelIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     filamentColorRef.current = filamentColor;
@@ -793,6 +820,7 @@ export default function STLViewer({
         object.rotation.set(0, 0, (model.rotationZ * Math.PI) / 180);
 
         const shouldAutoCenter =
+          normalizedModelIdsRef.current.has(model.id) ||
           !centeredModelIdsRef.current.has(model.id) &&
           Math.abs(model.positionX) <= 35 &&
           Math.abs(model.positionY) <= 35;
@@ -807,6 +835,7 @@ export default function STLViewer({
         object.updateMatrixWorld(true);
 
         if (shouldAutoCenter) {
+          normalizedModelIdsRef.current.delete(model.id);
           centeredModelIdsRef.current.add(model.id);
         }
 
@@ -967,8 +996,9 @@ export default function STLViewer({
             throw new Error("Unsupported model format");
           }
 
-          object.position.set(0, 0, 0);
-          centerAndGroundObject(object);
+          const plateSize = buildPlateSizeRef.current;
+          normalizeModelToBuildPlate(object, plateSize);
+          normalizedModelIdsRef.current.add(model.id);
           object.userData.modelId = model.id;
           object.traverse((child) => {
             child.userData.modelId = model.id;
@@ -978,6 +1008,14 @@ export default function STLViewer({
             }
           });
           scene.add(object);
+
+          if (onModelPositionChangeRef.current) {
+            onModelPositionChangeRef.current({
+              modelId: model.id,
+              positionX: 0,
+              positionY: 0,
+            });
+          }
 
           object.updateMatrixWorld(true);
           let baseVolumeCm3 = 0;
