@@ -400,14 +400,6 @@ export default function Calculator() {
     [selectedPrinter]
   );
 
-  const modelHasDimensions =
-    modelDimensions.width > 0 || modelDimensions.depth > 0 || modelDimensions.height > 0;
-
-  const modelFitsSelectedPrinter =
-    modelDimensions.width <= selectedPrinterDetails.buildVolume.width &&
-    modelDimensions.depth <= selectedPrinterDetails.buildVolume.depth &&
-    modelDimensions.height <= selectedPrinterDetails.buildVolume.height;
-
   const selectedModel = useMemo(
     () => models.find((model) => model.id === selectedModelId) ?? null,
     [models, selectedModelId]
@@ -514,11 +506,11 @@ export default function Calculator() {
   ];
 
   return (
-    <div className="layerledger-content mx-auto max-w-5xl space-y-6">
+    <div className="layerledger-content mx-auto max-w-4xl space-y-5">
       <section className="rounded-[28px] border border-black/10 bg-white/80 p-6 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_30px_80px_rgba(0,0,0,0.35)] md:p-8">
         <h1 className="text-center text-3xl font-black tracking-tight text-slate-900 dark:text-white md:text-4xl">3D Print Quote</h1>
         <p className="mx-auto mt-3 max-w-2xl text-center text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
-          Upload your model, preview it, choose printer and material, and get an instant customer quote.
+          Configure your print in a few steps and place your order instantly.
         </p>
       </section>
 
@@ -562,16 +554,17 @@ export default function Calculator() {
 
       <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">3D Model Preview</p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Preview only. Your model is auto-positioned for quoting.</p>
         <div className="mt-4 rounded-[22px] border border-black/10 bg-slate-100/80 p-3 dark:border-white/8 dark:bg-slate-900/70 md:p-4">
           <STLViewer
             models={models}
             selectedModelId={selectedModelId}
             filamentColor={filamentColor}
+            simpleView
             buildPlate={{
               width: selectedPrinterDetails.buildVolume.width,
               depth: selectedPrinterDetails.buildVolume.depth,
             }}
-            onSelectModel={setSelectedModelId}
             onAnalysisChange={handleAnalysisChange}
           />
         </div>
@@ -592,22 +585,6 @@ export default function Calculator() {
             </option>
           ))}
         </select>
-
-        <div
-          className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-medium ${
-            !modelHasDimensions
-              ? "border-yellow-500/30 bg-yellow-50 text-yellow-800 dark:border-yellow-400/20 dark:bg-yellow-500/10 dark:text-yellow-300"
-              : modelFitsSelectedPrinter
-                ? "border-green-500/30 bg-green-50 text-green-800 dark:border-green-400/20 dark:bg-green-500/10 dark:text-green-300"
-                : "border-yellow-500/30 bg-yellow-50 text-yellow-800 dark:border-yellow-400/20 dark:bg-yellow-500/10 dark:text-yellow-300"
-          }`}
-        >
-          {!modelHasDimensions
-            ? "Upload a model to check printer compatibility."
-            : modelFitsSelectedPrinter
-              ? "Model fits on this printer."
-              : "Model exceeds the selected printer build volume."}
-        </div>
       </section>
 
       <div className="text-center text-sm font-semibold text-slate-400">↓</div>

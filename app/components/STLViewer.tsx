@@ -22,6 +22,7 @@ type STLViewerProps = {
   selectedModelId: string | null;
   filamentColor: string;
   buildPlate: { width: number; depth: number };
+  simpleView?: boolean;
   onSelectModel?: (modelId: string | null) => void;
   onModelPositionChange?: (payload: { modelId: string; positionX: number; positionY: number }) => void;
   onModelFootprintsChange?: (payload: Record<string, { width: number; depth: number; height: number }>) => void;
@@ -472,6 +473,7 @@ export default function STLViewer({
   selectedModelId,
   filamentColor,
   buildPlate,
+  simpleView = false,
   onSelectModel,
   onModelPositionChange,
   onModelFootprintsChange,
@@ -546,11 +548,17 @@ export default function STLViewer({
       });
     }
 
+    if (simpleView) {
+      buildPlateRef.current = null;
+      buildPlateSizeRef.current = { width: plateWidth, depth: plateDepth };
+      return;
+    }
+
     const plate = createBuildPlate(plateWidth, plateDepth);
     scene.add(plate);
     buildPlateRef.current = plate;
     buildPlateSizeRef.current = { width: plateWidth, depth: plateDepth };
-  }, []);
+  }, [simpleView]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -682,9 +690,11 @@ export default function STLViewer({
       renderer.domElement.style.cursor = "grab";
     };
 
-    renderer.domElement.addEventListener("pointerdown", handlePointerDown);
-    renderer.domElement.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", stopDragging);
+    if (!simpleView) {
+      renderer.domElement.addEventListener("pointerdown", handlePointerDown);
+      renderer.domElement.addEventListener("pointermove", handlePointerMove);
+      window.addEventListener("pointerup", stopDragging);
+    }
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -693,6 +703,9 @@ export default function STLViewer({
     controls.target.set(0, 0, 0);
     controls.minDistance = 120;
     controls.maxDistance = 900;
+    controls.enableRotate = !simpleView;
+    controls.enablePan = !simpleView;
+    controls.enableZoom = !simpleView;
     controlsRef.current = controls;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.62));
@@ -714,15 +727,17 @@ export default function STLViewer({
 
     updateBuildPlate(buildPlate.width, buildPlate.depth);
 
-    const axesScene = new THREE.Scene();
-    axesScene.background = new THREE.Color(0xe2e8f0);
-    axesScene.add(createAxisWidget());
-    axesSceneRef.current = axesScene;
+    if (!simpleView) {
+      const axesScene = new THREE.Scene();
+      axesScene.background = new THREE.Color(0xe2e8f0);
+      axesScene.add(createAxisWidget());
+      axesSceneRef.current = axesScene;
 
-    const axesCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-    axesCamera.position.set(0, 0, 80);
-    axesCamera.lookAt(0, 0, 0);
-    axesCameraRef.current = axesCamera;
+      const axesCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+      axesCamera.position.set(0, 0, 80);
+      axesCamera.lookAt(0, 0, 0);
+      axesCameraRef.current = axesCamera;
+    }
 
     const resize = () => {
       camera.aspect = container.clientWidth / container.clientHeight;
@@ -741,7 +756,7 @@ export default function STLViewer({
       renderer.setScissorTest(false);
       renderer.render(scene, camera);
 
-      if (axesSceneRef.current && axesCameraRef.current) {
+      if (!simpleView && axesSceneRef.current && axesCameraRef.current) {
         const inset = Math.floor(Math.min(width, height) * 0.22);
         const padding = 12;
 
@@ -764,9 +779,11 @@ export default function STLViewer({
 
     return () => {
       window.removeEventListener("resize", resize);
-      renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
-      renderer.domElement.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", stopDragging);
+      if (!simpleView) {
+        renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
+        renderer.domElement.removeEventListener("pointermove", handlePointerMove);
+        window.removeEventListener("pointerup", stopDragging);
+      }
       cancelAnimationFrame(rafId);
       controls.dispose();
       renderer.dispose();
@@ -774,7 +791,7 @@ export default function STLViewer({
         container.removeChild(renderer.domElement);
       }
     };
-  }, [updateBuildPlate]);
+  }, [simpleView, updateBuildPlate]);
 
   useEffect(() => {
     updateBuildPlate(buildPlate.width, buildPlate.depth);
@@ -1030,6 +1047,7 @@ export default function STLViewer({
 
           const boundsBox = new THREE.Box3().setFromObject(object);
           const boundsHelper = new THREE.Box3Helper(boundsBox, 0x34d399);
+          boundsHelper.visible = !simpleView;
           (boundsHelper.material as THREE.LineBasicMaterial).transparent = true;
           (boundsHelper.material as THREE.LineBasicMaterial).opacity = 0.55;
           const dimensionSprite = createTextSprite("", {
@@ -1041,6 +1059,7 @@ export default function STLViewer({
             borderColor: "rgba(52,211,153,0.35)",
             scale: { x: 34, y: 9 },
           });
+          dimensionSprite.visible = !simpleView;
 
           scene.add(boundsHelper);
           scene.add(dimensionSprite);
@@ -1063,7 +1082,7 @@ export default function STLViewer({
 
     void loadMissingModels();
     applyTransformsAndAnalyze();
-  }, [models, selectedModelId, buildPlate.width, buildPlate.depth, onAnalysisChange]);
+  }, [models, selectedModelId, buildPlate.width, buildPlate.depth, onAnalysisChange, simpleView]);
 
   useEffect(() => {
     if (modelMapRef.current.size === 0) return;
