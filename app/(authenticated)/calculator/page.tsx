@@ -1,685 +1,363 @@
 "use client";
-import { useMemo, useState, useCallback, useRef, useEffect, type ChangeEvent } from "react";
-import STLViewer from "@/components/STLViewer";
-import type { ViewerModel } from "@/components/STLViewer";
 
-type PrinterOption = {
+import { useMemo, useState } from "react";
+
+type AccessoryItem = {
+  id: number;
   name: string;
-  buildVolume: { width: number; depth: number; height: number };
+  cost: string;
 };
 
-const PRINTER_OPTIONS: PrinterOption[] = [
-  { name: "Ender 3", buildVolume: { width: 220, depth: 220, height: 250 } },
-  { name: "Ender 3 V3 SE", buildVolume: { width: 220, depth: 220, height: 250 } },
-  { name: "Ender 3 S1", buildVolume: { width: 220, depth: 220, height: 270 } },
-  { name: "Ender 5 Plus", buildVolume: { width: 350, depth: 350, height: 400 } },
+const currency = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 2,
+});
 
-  { name: "CR-10", buildVolume: { width: 300, depth: 300, height: 400 } },
-  { name: "CR-10 Smart Pro", buildVolume: { width: 300, depth: 300, height: 400 } },
-
-  { name: "Bambu Lab A1", buildVolume: { width: 256, depth: 256, height: 256 } },
-  { name: "Bambu Lab A1 Mini", buildVolume: { width: 180, depth: 180, height: 180 } },
-  { name: "Bambu Lab P1P", buildVolume: { width: 256, depth: 256, height: 256 } },
-  { name: "Bambu Lab P1S", buildVolume: { width: 256, depth: 256, height: 256 } },
-  { name: "Bambu Lab X1 Carbon", buildVolume: { width: 256, depth: 256, height: 256 } },
-
-  { name: "Prusa MK3S+", buildVolume: { width: 250, depth: 210, height: 210 } },
-  { name: "Prusa MK4", buildVolume: { width: 250, depth: 210, height: 220 } },
-  { name: "Prusa XL", buildVolume: { width: 360, depth: 360, height: 360 } },
-
-  { name: "Creality K1", buildVolume: { width: 220, depth: 220, height: 250 } },
-
-  { name: "Anycubic Kobra 2", buildVolume: { width: 220, depth: 220, height: 250 } },
-  { name: "Anycubic Kobra Max", buildVolume: { width: 400, depth: 400, height: 450 } },
-
-  { name: "Elegoo Neptune 3 Pro", buildVolume: { width: 225, depth: 225, height: 280 } },
-  { name: "Elegoo Neptune 4", buildVolume: { width: 225, depth: 225, height: 265 } },
-  { name: "Elegoo Neptune 4 Max", buildVolume: { width: 420, depth: 420, height: 480 } },
-
-  { name: "Elegoo OrangeStorm Giga", buildVolume: { width: 800, depth: 800, height: 1000 } },
-];
-
-type PrinterProfile = {
-  power: number;
-  speed: number;
-  machineCostPerHour: number;
+const parseNumber = (value: string) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const PRINTER_PROFILES: Record<string, PrinterProfile> = {
-  "Ender 3": { power: 250, speed: 60, machineCostPerHour: 10 },
-  "Ender 3 V3 SE": { power: 260, speed: 80, machineCostPerHour: 10 },
-  "Ender 3 S1": { power: 270, speed: 80, machineCostPerHour: 12 },
-  "Ender 5 Plus": { power: 350, speed: 60, machineCostPerHour: 15 },
+export default function CalculatorPage() {
+  const [materialCostPerGram, setMaterialCostPerGram] = useState("2.5");
+  const [filamentUsed, setFilamentUsed] = useState("120");
 
-  "CR-10": { power: 350, speed: 60, machineCostPerHour: 15 },
-  "CR-10 Smart Pro": { power: 350, speed: 80, machineCostPerHour: 18 },
+  const [printTime, setPrintTime] = useState("5");
+  const [machineCostPerHour, setMachineCostPerHour] = useState("50");
+  const [electricityCostPerHour, setElectricityCostPerHour] = useState("8");
 
-  "Bambu Lab A1": { power: 350, speed: 200, machineCostPerHour: 20 },
-  "Bambu Lab A1 Mini": { power: 300, speed: 180, machineCostPerHour: 18 },
-  "Bambu Lab P1P": { power: 350, speed: 300, machineCostPerHour: 25 },
-  "Bambu Lab P1S": { power: 350, speed: 300, machineCostPerHour: 25 },
-  "Bambu Lab X1 Carbon": { power: 350, speed: 300, machineCostPerHour: 30 },
+  const [laborCost, setLaborCost] = useState("100");
+  const [failureRate, setFailureRate] = useState("5");
 
-  "Prusa MK3S+": { power: 250, speed: 60, machineCostPerHour: 15 },
-  "Prusa MK4": { power: 280, speed: 80, machineCostPerHour: 18 },
-  "Prusa XL": { power: 400, speed: 200, machineCostPerHour: 35 },
+  const [accessories, setAccessories] = useState<AccessoryItem[]>([
+    { id: 1, name: "Nozzle wear", cost: "20" },
+  ]);
 
-  "Creality K1": { power: 400, speed: 300, machineCostPerHour: 25 },
+  const [profitMargin, setProfitMargin] = useState(30);
+  const [gst, setGst] = useState("18");
 
-  "Anycubic Kobra 2": { power: 250, speed: 80, machineCostPerHour: 12 },
-  "Anycubic Kobra Max": { power: 400, speed: 80, machineCostPerHour: 20 },
-
-  "Elegoo Neptune 3 Pro": { power: 250, speed: 60, machineCostPerHour: 12 },
-  "Elegoo Neptune 4": { power: 300, speed: 250, machineCostPerHour: 20 },
-  "Elegoo Neptune 4 Max": { power: 400, speed: 250, machineCostPerHour: 25 },
-
-  "Elegoo OrangeStorm Giga": { power: 600, speed: 250, machineCostPerHour: 40 },
-};
-
-// Slicer-style filament estimation constants
-const WALLS_FACTOR = 0.35;          // shell / perimeter volume fraction
-const DEFAULT_INFILL_PERCENTAGE = 0.22; // default infill (22 %)
-const TOP_BOTTOM_FACTOR = 0.15;     // top and bottom solid layers
-const SUPPORTS_FACTOR = 0.05;       // estimated support material
-const SLICER_EFFICIENCY_FACTOR = 0.65; // extrusion path efficiency vs raw volume
-
-type MaterialType = "PLA" | "PETG" | "ABS" | "TPU" | "ASA" | "PLA+";
-
-const MATERIAL_LIBRARY: Record<
-  MaterialType,
-  {
-    name: string;
-    density: number;
-    defaultSpeed: number;
-    temperature: string;
-    badgeClass: string;
-  }
-> = {
-  PLA: {
-    name: "PLA",
-    density: 1.24,
-    defaultSpeed: 60,
-    temperature: "200-210 degC",
-    badgeClass: "bg-green-500/20 text-green-300 border-green-400/30",
-  },
-  PETG: {
-    name: "PETG",
-    density: 1.27,
-    defaultSpeed: 50,
-    temperature: "230-250 degC",
-    badgeClass: "bg-cyan-500/20 text-cyan-300 border-cyan-400/30",
-  },
-  ABS: {
-    name: "ABS",
-    density: 1.04,
-    defaultSpeed: 55,
-    temperature: "230-260 degC",
-    badgeClass: "bg-amber-500/20 text-amber-300 border-amber-400/30",
-  },
-  TPU: {
-    name: "TPU",
-    density: 1.21,
-    defaultSpeed: 35,
-    temperature: "210-230 degC",
-    badgeClass: "bg-violet-500/20 text-violet-300 border-violet-400/30",
-  },
-  ASA: {
-    name: "ASA",
-    density: 1.07,
-    defaultSpeed: 50,
-    temperature: "240-260 degC",
-    badgeClass: "bg-orange-500/20 text-orange-300 border-orange-400/30",
-  },
-  "PLA+": {
-    name: "PLA+",
-    density: 1.24,
-    defaultSpeed: 65,
-    temperature: "205-220 degC",
-    badgeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30",
-  },
-};
-
-const COLOR_OPTIONS = [
-  { name: "White", value: "#ffffff" },
-  { name: "Black", value: "#000000" },
-  { name: "Red", value: "#ef4444" },
-  { name: "Blue", value: "#3b82f6" },
-  { name: "Green", value: "#22c55e" },
-  { name: "Yellow", value: "#eab308" },
-  { name: "Orange", value: "#f97316" },
-  { name: "Gray", value: "#9ca3af" },
-];
-
-export default function Calculator() {
-  const defaultPrinterProfile = PRINTER_PROFILES[PRINTER_OPTIONS[0].name];
-
-  const [filamentUsed, setFilamentUsed] = useState("");
-  const [machinePowerWatts, setMachinePowerWatts] = useState(String(defaultPrinterProfile.power));
-  const [printSpeedMmPerSecond, setPrintSpeedMmPerSecond] = useState(String(defaultPrinterProfile.speed));
-  const [machineCostPerHour, setMachineCostPerHour] = useState(String(defaultPrinterProfile.machineCostPerHour));
-
-  // Internal pricing configuration (kept out of customer UI)
-  const filamentPricePerKg = "1200";
-  const electricityRate = "10";
-  const packagingCost = "0";
-  const shippingCost = "0";
-  const failureRate = "5";
-  const gstPercent = "0";
-  const profitMargin = "30";
-
-  const [materialType, setMaterialType] = useState<MaterialType>("PLA");
-  const [filamentColor, setFilamentColor] = useState("#00ff88");
-  const [selectedPrinter, setSelectedPrinter] = useState(PRINTER_OPTIONS[0].name);
-
-  const [models, setModels] = useState<ViewerModel[]>([]);
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  const [modelVolume, setModelVolume] = useState(0);
-  const [estimatedPrintTime, setEstimatedPrintTime] = useState(0);
-  const [modelDimensions, setModelDimensions] = useState({
-    width: 0,
-    depth: 0,
-    height: 0,
-  });
-  const [ownershipConfirmed, setOwnershipConfirmed] = useState(false);
-  const [showOwnershipWarning, setShowOwnershipWarning] = useState(false);
-  const [orderError, setOrderError] = useState("");
-  const [isOrdering, setIsOrdering] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const parseNumber = (value: string) => {
-    const parsed = parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : 0;
+  const addAccessory = () => {
+    setAccessories((prev) => [
+      ...prev,
+      { id: Date.now(), name: "", cost: "0" },
+    ]);
   };
 
-  const isSupportedModelFile = (file: File) => {
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    return ext === "stl" || ext === "obj" || ext === "3mf";
+  const removeAccessory = (id: number) => {
+    setAccessories((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const appendModels = (incomingFiles: File[]) => {
-    const supported = incomingFiles.filter(isSupportedModelFile);
-    const rejected = incomingFiles.length - supported.length;
-
-    if (rejected > 0) {
-      alert("Some files were skipped. Only STL, OBJ, and 3MF files are supported.");
-    }
-
-    if (supported.length === 0) {
-      return;
-    }
-
-    const startOffset = models.length;
-    const createdModels: ViewerModel[] = supported.map((file, index) => {
-      const id = `${Date.now()}-${startOffset + index}-${Math.random().toString(36).slice(2, 8)}`;
-      const offset = (startOffset + index) * 25;
-      return {
-        id,
-        name: file.name,
-        file,
-        scale: 1,
-        positionX: offset,
-        positionY: offset,
-        rotationZ: 0,
-      };
-    });
-
-    setModels((prev) => [...prev, ...createdModels]);
-
-    if (!selectedModelId) {
-      setSelectedModelId(createdModels[0].id);
-    }
+  const updateAccessory = (id: number, key: "name" | "cost", value: string) => {
+    setAccessories((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [key]: value } : item))
+    );
   };
 
-  const handleUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    if (!ownershipConfirmed) {
-      setShowOwnershipWarning(true);
-      return;
-    }
+  const values = useMemo(() => {
+    const materialCost = parseNumber(materialCostPerGram) * parseNumber(filamentUsed);
+    const machineCost = parseNumber(printTime) * parseNumber(machineCostPerHour);
+    const electricityCost = parseNumber(printTime) * parseNumber(electricityCostPerHour);
 
-    const files = e.target.files ? Array.from(e.target.files) : [];
-    appendModels(files);
-    setShowOwnershipWarning(false);
-  };
+    const accessoriesCost = accessories.reduce(
+      (sum, item) => sum + parseNumber(item.cost),
+      0
+    );
 
-  const handleClearModel = () => {
-    setModels([]);
-    setSelectedModelId(null);
-    setModelVolume(0);
-    setEstimatedPrintTime(0);
-    setModelDimensions({ width: 0, depth: 0, height: 0 });
-    setFilamentUsed("0.00");
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const handleAnalysisChange = useCallback((payload: {
-    totalVolumeCm3: number;
-    dimensionsMm: { width: number; depth: number; height: number };
-  }) => {
-    setModelVolume(payload.totalVolumeCm3);
-    setModelDimensions(payload.dimensionsMm);
-  }, []);
-
-  const selectedMaterialConfig = useMemo(
-    () => MATERIAL_LIBRARY[materialType],
-    [materialType]
-  );
-
-  useEffect(() => {
-    const profile = PRINTER_PROFILES[selectedPrinter];
-    if (!profile) return;
-
-    setMachinePowerWatts(String(profile.power));
-    setPrintSpeedMmPerSecond(String(profile.speed));
-    setMachineCostPerHour(String(profile.machineCostPerHour));
-  }, [selectedPrinter]);
-
-  // Filament estimation — only recalculates on model change, material change, or printer profile change.
-  // This prevents the weight from fluctuating when unrelated UI fields (speed, price, etc.) are edited.
-  useEffect(() => {
-    if (modelVolume <= 0) {
-      setFilamentUsed("0.00");
-      return;
-    }
-
-    const infillPercentage = DEFAULT_INFILL_PERCENTAGE;
-    const materialDensity = MATERIAL_LIBRARY[materialType]?.density ?? 1.24;
-
-    const wallsVolume    = modelVolume * WALLS_FACTOR;
-    const infillVolume   = modelVolume * infillPercentage;
-    const topBotVolume   = modelVolume * TOP_BOTTOM_FACTOR;
-    const supportsVolume = modelVolume * SUPPORTS_FACTOR;
-
-    const bodyVolume = wallsVolume + infillVolume + topBotVolume;
-    const effectiveVolume = bodyVolume + supportsVolume;
-
-    const rawFilamentWeight = effectiveVolume * materialDensity;
-    const filamentWeight    = Math.round(rawFilamentWeight * SLICER_EFFICIENCY_FACTOR * 100) / 100;
-
-    setFilamentUsed(filamentWeight.toFixed(2));
-  }, [modelVolume, materialType, selectedPrinter]);
-
-  // Print-time estimation — recalculates on model or speed change only.
-  useEffect(() => {
-    if (modelVolume <= 0) {
-      setEstimatedPrintTime(0);
-      return;
-    }
-    const volumeMm3 = modelVolume * 1000;
-    const selectedSpeed = Math.max(parseNumber(printSpeedMmPerSecond), 1);
-    const baseFlowRate = 12; // mm³/s at 60 mm/s baseline speed
-    const flowRateMm3PerSecond = Math.max(1, baseFlowRate * (selectedSpeed / 60));
-    const estimatedHours = volumeMm3 / flowRateMm3PerSecond / 3600;
-    setEstimatedPrintTime(estimatedHours);
-  }, [modelVolume, printSpeedMmPerSecond]);
-
-  const {
-    filamentCost,
-    electricityCost,
-    machineCost,
-  } = useMemo(() => {
-    const filamentUsedNum = parseNumber(filamentUsed);
-    const filamentPriceNum = parseNumber(filamentPricePerKg);
-    const printHoursNum = Math.max(estimatedPrintTime, 0);
-    const electricityRateNum = parseNumber(electricityRate);
-    const machinePowerNum = parseNumber(machinePowerWatts);
-    const machineCostPerHourNum = parseNumber(machineCostPerHour);
-    const packagingCostNum = parseNumber(packagingCost);
-    const shippingCostNum = parseNumber(shippingCost);
-    const failureRateNum = parseNumber(failureRate);
-    const gstPercentNum = parseNumber(gstPercent);
-    const profitMarginNum = parseNumber(profitMargin);
-
-    const filamentCost = (filamentUsedNum / 1000) * filamentPriceNum;
-
-    const electricityCost =
-      (machinePowerNum / 1000) * printHoursNum * electricityRateNum;
-
-    const machineCost = machineCostPerHourNum * printHoursNum;
-
-    const totalProductionCost =
-      filamentCost +
-      electricityCost +
+    const baseCost =
+      materialCost +
       machineCost +
-      packagingCostNum +
-      shippingCostNum;
+      electricityCost +
+      parseNumber(laborCost) +
+      accessoriesCost;
 
-    const adjustedCost = totalProductionCost * (1 + failureRateNum / 100);
+    const safeFailureRate = Math.min(Math.max(parseNumber(failureRate), 0), 99);
+    const adjustedCost = baseCost / (1 - safeFailureRate / 100);
 
-    const profitAmount = adjustedCost * (profitMarginNum / 100);
-
-    const baseSellingPrice = adjustedCost + profitAmount;
-
-    const gstAmount = (baseSellingPrice * gstPercentNum) / 100;
-
-    const finalPrice = baseSellingPrice + gstAmount;
+    const profit = adjustedCost * (profitMargin / 100);
+    const finalPrice = adjustedCost + profit;
+    const gstAmount = finalPrice * (parseNumber(gst) / 100);
+    const finalPriceWithGST = finalPrice + gstAmount;
 
     return {
-      filamentCost,
-      electricityCost,
+      materialCost,
       machineCost,
+      electricityCost,
+      accessoriesCost,
+      baseCost,
+      adjustedCost,
+      profit,
+      finalPrice,
+      gstAmount,
+      finalPriceWithGST,
     };
   }, [
+    materialCostPerGram,
     filamentUsed,
-    filamentPricePerKg,
-    estimatedPrintTime,
-    electricityRate,
-    machinePowerWatts,
+    printTime,
     machineCostPerHour,
-    packagingCost,
-    shippingCost,
+    electricityCostPerHour,
+    laborCost,
+    accessories,
     failureRate,
-    gstPercent,
     profitMargin,
+    gst,
   ]);
 
-  const instantPriceQuote = useMemo(() => {
-    const packagingCostNum = parseNumber(packagingCost);
-    const shippingCostNum = parseNumber(shippingCost);
-    const productionCost =
-      filamentCost +
-      electricityCost +
-      machineCost +
-      packagingCostNum +
-      shippingCostNum;
-
-    return productionCost * 1.3;
-  }, [
-    filamentCost,
-    electricityCost,
-    machineCost,
-    packagingCost,
-    shippingCost,
-  ]);
-
-  const selectedPrinterDetails = useMemo(
-    () => PRINTER_OPTIONS.find((printer) => printer.name === selectedPrinter) ?? PRINTER_OPTIONS[0],
-    [selectedPrinter]
-  );
-
-  const selectedModel = useMemo(
-    () => models.find((model) => model.id === selectedModelId) ?? null,
-    [models, selectedModelId]
-  );
-
-  const handleOrderThisPrint = async () => {
-    if (!selectedModel) {
-      setOrderError("Upload a model before ordering.");
-      return;
-    }
-
-    if (!selectedModel.file) {
-      setOrderError("No model file found. Please upload your model again.");
-      return;
-    }
-
-    try {
-      setIsOrdering(true);
-      setOrderError("");
-
-      console.log("Order This Print file check", {
-        hasFile: Boolean(selectedModel.file),
-        fileName: selectedModel.file.name,
-        fileSize: selectedModel.file.size,
-      });
-
-      const stlReferenceUrl = `local-file://${encodeURIComponent(selectedModel.file.name)}`;
-      const selectedColorName =
-        COLOR_OPTIONS.find((option) => option.value === filamentColor)?.name ?? filamentColor;
-
-      console.log("Order This Print starting create-product API call");
-
-      const createProductResponse = await fetch("/api/create-product", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: `${selectedModel.name} 3D Print`,
-          price: instantPriceQuote.toFixed(2),
-          weight: `${filamentUsed || "0.00"} g`,
-          time: `${estimatedPrintTime.toFixed(2)} hrs`,
-          material: `${selectedMaterialConfig.name} / ${selectedColorName}`,
-          stlUrl: stlReferenceUrl,
-        }),
-      });
-
-      const productData = (await createProductResponse.json()) as {
-        success?: boolean;
-        error?: string;
-        details?: string;
-        status?: number;
-        product?: { id?: number; handle?: string; variantId?: number };
-        cartUrl?: string;
-      };
-
-      console.log("Create product API response", {
-        httpStatus: createProductResponse.status,
-        body: productData,
-      });
-
-      if (
-        !createProductResponse.ok ||
-        (typeof productData.status === "number" && productData.status >= 400) ||
-        productData.error
-      ) {
-        throw new Error(productData.details || productData.error || "Failed to create Shopify product");
-      }
-
-      const cartUrl = productData.cartUrl;
-      if (!cartUrl) {
-        throw new Error("Shopify cart/checkout URL missing from response");
-      }
-
-      console.log("Order This Print product created", {
-        productId: productData.product?.id,
-        handle: productData.product?.handle,
-        variantId: productData.product?.variantId,
-      });
-      console.log("Order This Print Variant ID:", productData.product?.variantId);
-      console.log("Order This Print Checkout URL:", cartUrl);
-
-      window.location.href = cartUrl;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not create Shopify product.";
-      console.error("Order This Print failed", {
-        message,
-      });
-      setOrderError(message);
-    } finally {
-      setIsOrdering(false);
-    }
-  };
-
-  const analysisCards = [
-    {
-      label: "Estimated Filament Usage (±10% accuracy)",
-      value: `${filamentUsed || "0.00"} g`,
-    },
-    {
-      label: "Dimensions",
-      value: `${modelDimensions.width.toFixed(2)} × ${modelDimensions.depth.toFixed(2)} × ${modelDimensions.height.toFixed(2)} mm`,
-    },
-    {
-      label: "Print Time",
-      value: `${estimatedPrintTime.toFixed(2)} hrs`,
-    },
-  ];
+  const cardClass =
+    "rounded-3xl border border-white/10 bg-slate-950/70 p-5 shadow-sm backdrop-blur-sm sm:p-6";
+  const inputClass =
+    "mt-2 w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2.5 text-sm text-white outline-none transition focus:border-green-400/60 focus:ring-2 focus:ring-green-500/20";
 
   return (
-    <div className="layerledger-content mx-auto max-w-4xl space-y-5">
-      <section className="rounded-[28px] border border-black/10 bg-white/80 p-6 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_30px_80px_rgba(0,0,0,0.35)] md:p-8">
-        <h1 className="text-center text-3xl font-black tracking-tight text-slate-900 dark:text-white md:text-4xl">3D Print Quote</h1>
-        <p className="mx-auto mt-3 max-w-2xl text-center text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
-          Configure your print in a few steps and place your order instantly.
+    <div className="layerledger-content space-y-6">
+      <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 backdrop-blur-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-green-300">
+          Pricing Calculator
         </p>
-      </section>
+        <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
+          3D Printing Profit Calculator
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm text-slate-300">
+          Enter your production costs and margins to instantly generate a clear, profitable selling price.
+        </p>
+      </div>
 
-      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Upload Model</p>
-        <h2 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">STL / OBJ / 3MF Upload</h2>
-        <label className="mt-4 flex items-start gap-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-          <input
-            type="checkbox"
-            checked={ownershipConfirmed}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              setOwnershipConfirmed(checked);
-              if (checked) setShowOwnershipWarning(false);
-            }}
-            className="mt-0.5 h-4 w-4 accent-green-500"
-          />
-          <span>I confirm that I own this model or have permission to print it.</span>
-        </label>
-        {showOwnershipWarning ? <p className="mt-3 text-xs text-red-500 dark:text-red-400">Please confirm model ownership before uploading.</p> : null}
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".stl,.obj,.3mf"
-          multiple
-          onChange={handleUpload}
-          disabled={!ownershipConfirmed}
-          className="mt-4 block w-full text-sm text-slate-700 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-300 dark:file:bg-white/10"
-        />
-
-        <button
-          onClick={handleClearModel}
-          className="mt-4 w-full rounded-2xl border border-black/10 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 transition-all hover:bg-slate-200 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
-        >
-          Clear Model
-        </button>
-      </section>
-
-      <div className="text-center text-sm font-semibold text-slate-400">↓</div>
-
-      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">3D Model Preview</p>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Preview only. Your model is auto-positioned for quoting.</p>
-        <div className="mt-4 rounded-[22px] border border-black/10 bg-slate-100/80 p-3 dark:border-white/8 dark:bg-slate-900/70 md:p-4">
-          <STLViewer
-            models={models}
-            selectedModelId={selectedModelId}
-            filamentColor={filamentColor}
-            simpleView
-            buildPlate={{
-              width: selectedPrinterDetails.buildVolume.width,
-              depth: selectedPrinterDetails.buildVolume.depth,
-            }}
-            onAnalysisChange={handleAnalysisChange}
-          />
-        </div>
-      </section>
-
-      <div className="text-center text-sm font-semibold text-slate-400">↓</div>
-
-      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Printer Selection</p>
-        <select
-          value={selectedPrinter}
-          onChange={(e) => setSelectedPrinter(e.target.value)}
-          className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-3 text-sm text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white"
-        >
-          {PRINTER_OPTIONS.map((printer) => (
-            <option key={printer.name} value={printer.name}>
-              {printer.name} - {printer.buildVolume.width} × {printer.buildVolume.depth} × {printer.buildVolume.height} mm
-            </option>
-          ))}
-        </select>
-      </section>
-
-      <div className="text-center text-sm font-semibold text-slate-400">↓</div>
-
-      <section className="grid gap-5 rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 md:grid-cols-2">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Material Selection</p>
-          <select
-            value={materialType}
-            onChange={(e) => setMaterialType(e.target.value as MaterialType)}
-            className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-3 text-sm text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white"
-          >
-            {(Object.keys(MATERIAL_LIBRARY) as MaterialType[]).map((materialKey) => (
-              <option key={materialKey} value={materialKey}>
-                {MATERIAL_LIBRARY[materialKey].name}
-              </option>
-            ))}
-          </select>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Temperature: {selectedMaterialConfig.temperature}</p>
-        </div>
-
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Filament Color</p>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {COLOR_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setFilamentColor(option.value)}
-                className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition-all ${
-                  filamentColor === option.value
-                    ? "border-green-500/50 bg-green-50 dark:border-green-400/40 dark:bg-green-500/10"
-                    : "border-black/10 bg-white hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
-                }`}
-              >
-                <span className="inline-block h-3.5 w-3.5 rounded-full border border-black/20 dark:border-white/20" style={{ backgroundColor: option.value }} />
-                <span className="text-xs text-slate-900 dark:text-white">{option.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <div className="text-center text-sm font-semibold text-slate-400">↓</div>
-
-      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Model Analysis</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {analysisCards.map((item) => (
-            <div key={item.label} className="rounded-xl border border-black/10 bg-slate-100/80 p-3.5 dark:border-white/8 dark:bg-slate-900/80">
-              <p className="text-xs text-slate-500 dark:text-slate-400">{item.label}</p>
-              <p className="mt-1.5 text-base font-semibold text-slate-900 dark:text-white">{item.value}</p>
+      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+        <div className="space-y-6">
+          <section className={cardClass}>
+            <h2 className="text-lg font-bold text-white">Material</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="text-sm text-slate-300">
+                Material cost per gram
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={materialCostPerGram}
+                  onChange={(e) => setMaterialCostPerGram(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="text-sm text-slate-300">
+                Filament used (grams)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={filamentUsed}
+                  onChange={(e) => setFilamentUsed(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
             </div>
-          ))}
+          </section>
+
+          <section className={cardClass}>
+            <h2 className="text-lg font-bold text-white">Machine &amp; Time</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <label className="text-sm text-slate-300">
+                Print time (hours)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={printTime}
+                  onChange={(e) => setPrintTime(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="text-sm text-slate-300">
+                Machine cost per hour
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={machineCostPerHour}
+                  onChange={(e) => setMachineCostPerHour(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="text-sm text-slate-300">
+                Electricity cost per hour
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={electricityCostPerHour}
+                  onChange={(e) => setElectricityCostPerHour(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className={cardClass}>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-bold text-white">Extra Costs</h2>
+              <button
+                type="button"
+                onClick={addAccessory}
+                className="rounded-xl border border-green-400/30 bg-green-500/15 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-green-300 transition hover:bg-green-500/25"
+              >
+                Add accessory
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="text-sm text-slate-300">
+                Labor cost
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={laborCost}
+                  onChange={(e) => setLaborCost(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="text-sm text-slate-300">
+                Failure rate (%)
+                <input
+                  type="number"
+                  min="0"
+                  max="99"
+                  step="0.1"
+                  value={failureRate}
+                  onChange={(e) => setFailureRate(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {accessories.map((item) => (
+                <div
+                  key={item.id}
+                  className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 sm:grid-cols-[1fr_140px_auto]"
+                >
+                  <input
+                    type="text"
+                    placeholder="Accessory name"
+                    value={item.name}
+                    onChange={(e) => updateAccessory(item.id, "name", e.target.value)}
+                    className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2.5 text-sm text-white outline-none transition focus:border-green-400/60 focus:ring-2 focus:ring-green-500/20"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Cost"
+                    value={item.cost}
+                    onChange={(e) => updateAccessory(item.id, "cost", e.target.value)}
+                    className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2.5 text-sm text-white outline-none transition focus:border-green-400/60 focus:ring-2 focus:ring-green-500/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeAccessory(item.id)}
+                    className="rounded-xl border border-red-400/30 bg-red-500/15 px-3 py-2.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/25"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm text-slate-300">
+              Accessories total: <span className="font-semibold text-white">{currency.format(values.accessoriesCost)}</span>
+            </div>
+          </section>
+
+          <section className={cardClass}>
+            <h2 className="text-lg font-bold text-white">Pricing</h2>
+            <div className="mt-4 space-y-5">
+              <label className="block text-sm text-slate-300">
+                Profit margin: <span className="font-semibold text-white">{profitMargin}%</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={profitMargin}
+                  onChange={(e) => setProfitMargin(Number.parseInt(e.target.value, 10) || 0)}
+                  className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-700 accent-green-500"
+                />
+              </label>
+
+              <label className="block text-sm text-slate-300">
+                GST (%)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={gst}
+                  onChange={(e) => setGst(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
+            </div>
+          </section>
         </div>
-      </section>
 
-      <div className="text-center text-sm font-semibold text-slate-400">↓</div>
+        <aside className="lg:sticky lg:top-6 lg:h-fit">
+          <section className={`${cardClass} space-y-4`}>
+            <h2 className="text-lg font-bold text-white">Result</h2>
 
-      <section className="rounded-[24px] border border-green-500/30 bg-gradient-to-br from-green-100/70 via-emerald-100/50 to-white p-5 shadow-[0_24px_80px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-green-400/20 dark:from-green-500/20 dark:via-emerald-500/12 dark:to-slate-950/90 dark:shadow-[0_24px_80px_rgba(0,0,0,0.3)]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-green-200">Instant Price Quote</p>
-        <div className="mt-4 rounded-2xl border border-black/10 bg-white/80 p-5 text-center dark:border-white/10 dark:bg-black/20">
-          <p className="text-xs uppercase tracking-[0.24em] text-emerald-800/70 dark:text-green-200/70">Estimated Quote</p>
-          <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">₹{instantPriceQuote.toFixed(2)}</p>
-        </div>
+            <div className="space-y-2 text-sm text-slate-300">
+              <div className="flex items-center justify-between">
+                <span>Material cost</span>
+                <span className="font-medium text-white">{currency.format(values.materialCost)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Machine cost</span>
+                <span className="font-medium text-white">{currency.format(values.machineCost)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Electricity cost</span>
+                <span className="font-medium text-white">{currency.format(values.electricityCost)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Labor cost</span>
+                <span className="font-medium text-white">{currency.format(parseNumber(laborCost))}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Accessories cost</span>
+                <span className="font-medium text-white">{currency.format(values.accessoriesCost)}</span>
+              </div>
+              <div className="my-2 border-t border-white/10" />
+              <div className="flex items-center justify-between">
+                <span>Base cost</span>
+                <span className="font-medium text-white">{currency.format(values.baseCost)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Adjusted cost (failure rate)</span>
+                <span className="font-medium text-white">{currency.format(values.adjustedCost)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Profit</span>
+                <span className="font-medium text-green-300">{currency.format(values.profit)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Final price (before GST)</span>
+                <span className="font-medium text-white">{currency.format(values.finalPrice)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>GST amount</span>
+                <span className="font-medium text-white">{currency.format(values.gstAmount)}</span>
+              </div>
+            </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-          <div className="rounded-xl border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-black/20">
-            <p className="text-[10px] text-slate-500 dark:text-green-100/70">Filament</p>
-            <p className="mt-1 font-semibold text-slate-900 dark:text-white">₹ {filamentCost.toFixed(2)}</p>
-          </div>
-          <div className="rounded-xl border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-black/20">
-            <p className="text-[10px] text-slate-500 dark:text-green-100/70">Electricity</p>
-            <p className="mt-1 font-semibold text-slate-900 dark:text-white">₹ {electricityCost.toFixed(2)}</p>
-          </div>
-          <div className="rounded-xl border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-black/20">
-            <p className="text-[10px] text-slate-500 dark:text-green-100/70">Machine</p>
-            <p className="mt-1 font-semibold text-slate-900 dark:text-white">₹ {machineCost.toFixed(2)}</p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleOrderThisPrint}
-          disabled={!selectedModel || isOrdering}
-          className="mt-6 w-full rounded-2xl bg-gradient-to-r from-green-500 to-emerald-400 px-6 py-4 text-lg font-black text-black shadow-[0_12px_40px_rgba(34,197,94,0.24)] transition-all duration-200 hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isOrdering ? "Preparing Your Print..." : "Order This Print"}
-        </button>
-
-        {orderError ? <p className="mt-3 text-sm font-semibold text-red-600 dark:text-red-400">{orderError}</p> : null}
-      </section>
+            <div className="rounded-2xl border border-green-400/25 bg-green-500/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-green-200">
+                Final Price With GST
+              </p>
+              <p className="mt-1 text-3xl font-black tracking-tight text-green-300 sm:text-4xl">
+                {currency.format(values.finalPriceWithGST)}
+              </p>
+            </div>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }
