@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import STLViewer from "@/components/STLViewer";
 import type { ViewerModel } from "@/components/STLViewer";
 import { PRINTER_OPTIONS, PRINTER_PROFILES } from "@/lib/printers";
@@ -71,6 +72,11 @@ export function LayerLedgerWidget({
   const [estimatedPrintTime, setEstimatedPrintTime] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const router = useRouter();
+  const [quantity, setQuantity] = useState(1);
+  const [proceedError, setProceedError] = useState("");
+  const [proceeding, setProceeding] = useState(false);
 
   const printerProfile = PRINTER_PROFILES[selectedPrinter] ?? PRINTER_PROFILES[PRINTER_OPTIONS[0].name];
   const selectedPrinterVolume =
@@ -162,6 +168,25 @@ export function LayerLedgerWidget({
     await appendModels(files);
   };
 
+  const handleProceedToOrder = () => {
+    if (!selectedModel || !uploadedFileUrl) {
+      setProceedError("Please upload an STL file before proceeding.");
+      return;
+    }
+    setProceedError("");
+    setProceeding(true);
+    const params = new URLSearchParams({
+      fileName: selectedModel.name,
+      material: selectedMaterial,
+      width: modelDimensions.width.toFixed(2),
+      depth: modelDimensions.depth.toFixed(2),
+      height: modelDimensions.height.toFixed(2),
+      qty: String(quantity),
+    });
+    console.log("[LayerLedger] Proceeding to order with:", Object.fromEntries(params));
+    router.push(`/jobs?${params.toString()}`);
+  };
+
   const handleAddPrintToCart = async () => {
     const variantId = process.env.NEXT_PUBLIC_SHOPIFY_VARIANT_ID;
     if (!variantId) {
@@ -250,7 +275,12 @@ export function LayerLedgerWidget({
               className="mt-2 block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-200 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-800"
             />
             {uploading ? <p className="mt-2 text-xs text-slate-500">Uploading model...</p> : null}
-            {uploadedFileUrl ? <p className="mt-2 truncate text-xs text-emerald-700">Uploaded: {uploadedFileUrl}</p> : null}
+            {uploadedFileUrl ? (
+              <p className="mt-2 flex items-center gap-1 text-xs font-medium text-emerald-700">
+                <span>✓</span>
+                <span className="truncate">{selectedModel?.name ?? "Model"} uploaded successfully</span>
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -287,6 +317,21 @@ export function LayerLedgerWidget({
               }}
             />
           </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-500">Quantity</p>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={quantity}
+              onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              className="mt-2 w-32 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800"
+            />
+          </div>
+          <div />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -355,6 +400,16 @@ export function LayerLedgerWidget({
 
         {cartConfirmation ? <p className="text-xs text-emerald-700">{cartConfirmation}</p> : null}
         {errorMessage ? <p className="text-xs text-red-600">{errorMessage}</p> : null}
+
+        <button
+          type="button"
+          onClick={handleProceedToOrder}
+          disabled={proceeding}
+          className="w-full rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {proceeding ? "Redirecting..." : "Proceed to Order →"}
+        </button>
+        {proceedError ? <p className="text-xs text-red-600">{proceedError}</p> : null}
       </div>
     </section>
   );
