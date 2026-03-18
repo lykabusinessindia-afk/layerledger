@@ -511,9 +511,9 @@ export default function Calculator() {
   return (
     <div className="layerledger-content mx-auto max-w-4xl space-y-5">
       <section className="rounded-[28px] border border-black/10 bg-white/80 p-6 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_30px_80px_rgba(0,0,0,0.35)] md:p-8">
-        <h1 className="text-center text-3xl font-black tracking-tight text-slate-900 dark:text-white md:text-4xl">3D Print Quote</h1>
+        <h1 className="text-center text-3xl font-black tracking-tight text-slate-900 dark:text-white md:text-4xl">Upload Your STL</h1>
         <p className="mx-auto mt-3 max-w-2xl text-center text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
-          Configure your print in a few steps and place your order instantly.
+          Upload your 3D model, customize your print, and place your order.
         </p>
       </section>
 

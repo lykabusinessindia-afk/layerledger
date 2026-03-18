@@ -61,7 +61,7 @@ export default function AuthenticatedLayout({
   const navItems: NavItem[] = useMemo(
     () => [
       { label: "Dashboard", href: "/dashboard" },
-      { label: "Calculator", href: "/calculator" },
+      { label: "Upload STL", href: "/calculator" },
       { label: "Jobs", href: "/jobs" },
       { label: "Settings", href: "/settings" },
       { label: "Logout", action: handleLogout },
