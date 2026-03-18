@@ -2,6 +2,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect, type ChangeEvent } from "react";
 import STLViewer from "@/components/STLViewer";
 import type { ViewerModel } from "@/components/STLViewer";
+import { calculatePricingBreakdown } from "@/lib/pricing";
 
 type PrinterOption = {
   name: string;
@@ -163,8 +164,6 @@ export default function Calculator() {
   const electricityRate = "10";
   const packagingCost = "0";
   const shippingCost = "0";
-  const failureRate = "5";
-  const gstPercent = "0";
   const profitMargin = "30";
 
   const [materialType, setMaterialType] = useState<MaterialType>("PLA");
@@ -319,6 +318,7 @@ export default function Calculator() {
     filamentCost,
     electricityCost,
     machineCost,
+    totalProductionCost,
   } = useMemo(() => {
     const filamentUsedNum = parseNumber(filamentUsed);
     const filamentPriceNum = parseNumber(filamentPricePerKg);
@@ -328,9 +328,6 @@ export default function Calculator() {
     const machineCostPerHourNum = parseNumber(machineCostPerHour);
     const packagingCostNum = parseNumber(packagingCost);
     const shippingCostNum = parseNumber(shippingCost);
-    const failureRateNum = parseNumber(failureRate);
-    const gstPercentNum = parseNumber(gstPercent);
-    const profitMarginNum = parseNumber(profitMargin);
 
     const filamentCost = (filamentUsedNum / 1000) * filamentPriceNum;
 
@@ -339,27 +336,26 @@ export default function Calculator() {
 
     const machineCost = machineCostPerHourNum * printHoursNum;
 
-    const totalProductionCost =
-      filamentCost +
-      electricityCost +
-      machineCost +
-      packagingCostNum +
-      shippingCostNum;
-
-    const adjustedCost = totalProductionCost * (1 + failureRateNum / 100);
-
-    const profitAmount = adjustedCost * (profitMarginNum / 100);
-
-    const baseSellingPrice = adjustedCost + profitAmount;
-
-    const gstAmount = (baseSellingPrice * gstPercentNum) / 100;
-
-    const finalPrice = baseSellingPrice + gstAmount;
+    const breakdown = calculatePricingBreakdown({
+      materialCostPerGram: filamentUsedNum > 0 ? filamentCost / filamentUsedNum : 0,
+      filamentUsedGrams: filamentUsedNum,
+      printTimeHours: printHoursNum,
+      machineCostPerHour: machineCostPerHourNum,
+      electricityCostPerHour: electricityRateNum * (machinePowerNum / 1000),
+      laborCost: 0,
+      accessoriesCost: 0,
+      packagingCost: packagingCostNum,
+      shippingCost: shippingCostNum,
+      failureRatePercent: 0,
+      profitMarginPercent: 0,
+      gstPercent: 0,
+    });
 
     return {
       filamentCost,
       electricityCost,
       machineCost,
+      totalProductionCost: breakdown.baseCost,
     };
   }, [
     filamentUsed,
@@ -370,28 +366,14 @@ export default function Calculator() {
     machineCostPerHour,
     packagingCost,
     shippingCost,
-    failureRate,
-    gstPercent,
-    profitMargin,
   ]);
 
   const instantPriceQuote = useMemo(() => {
-    const packagingCostNum = parseNumber(packagingCost);
-    const shippingCostNum = parseNumber(shippingCost);
-    const productionCost =
-      filamentCost +
-      electricityCost +
-      machineCost +
-      packagingCostNum +
-      shippingCostNum;
-
-    return productionCost * 1.3;
+    const profitMarginNum = parseNumber(profitMargin);
+    return totalProductionCost * (1 + profitMarginNum / 100);
   }, [
-    filamentCost,
-    electricityCost,
-    machineCost,
-    packagingCost,
-    shippingCost,
+    totalProductionCost,
+    profitMargin,
   ]);
 
   const selectedPrinterDetails = useMemo(

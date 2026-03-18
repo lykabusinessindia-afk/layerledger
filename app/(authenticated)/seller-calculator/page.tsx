@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { calculatePricingBreakdown, toNumber } from "@/lib/pricing";
 
 type AccessoryItem = {
   id: number;
@@ -13,11 +14,6 @@ const currency = new Intl.NumberFormat("en-IN", {
   currency: "INR",
   maximumFractionDigits: 2,
 });
-
-const parseNumber = (value: string) => {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
 
 const defaultState = {
   materialCostPerGram: "2.5",
@@ -92,20 +88,21 @@ export default function SellerCalculatorPage() {
   };
 
   const values = useMemo(() => {
-    const materialCost = parseNumber(materialCostPerGram) * parseNumber(filamentUsed);
-    const machineCost = parseNumber(printTime) * parseNumber(machineCostPerHour);
-    const electricityCost = parseNumber(printTime) * parseNumber(electricityCostPerHour);
-    const accessoriesCost = accessories.reduce((sum, item) => sum + parseNumber(item.cost), 0);
-    const packaging = parseNumber(packagingCost);
-    const shipping = parseNumber(shippingCost);
-    const baseCost = materialCost + machineCost + electricityCost + parseNumber(laborCost) + accessoriesCost + packaging + shipping;
-    const safeFailureRate = Math.min(Math.max(parseNumber(failureRate), 0), 99);
-    const adjustedCost = baseCost / (1 - safeFailureRate / 100);
-    const profitAmount = adjustedCost * (profitMargin / 100);
-    const finalPrice = adjustedCost + profitAmount;
-    const gstAmount = finalPrice * (parseNumber(gst) / 100);
-    const finalPriceWithGST = finalPrice + gstAmount;
-    return { materialCost, machineCost, electricityCost, accessoriesCost, packagingCost: packaging, shippingCost: shipping, baseCost, adjustedCost, profitAmount, finalPrice, gstAmount, finalPriceWithGST };
+    const accessoriesCost = accessories.reduce((sum, item) => sum + toNumber(item.cost), 0);
+    return calculatePricingBreakdown({
+      materialCostPerGram: toNumber(materialCostPerGram),
+      filamentUsedGrams: toNumber(filamentUsed),
+      printTimeHours: toNumber(printTime),
+      machineCostPerHour: toNumber(machineCostPerHour),
+      electricityCostPerHour: toNumber(electricityCostPerHour),
+      laborCost: toNumber(laborCost),
+      accessoriesCost,
+      packagingCost: toNumber(packagingCost),
+      shippingCost: toNumber(shippingCost),
+      failureRatePercent: toNumber(failureRate),
+      profitMarginPercent: profitMargin,
+      gstPercent: toNumber(gst),
+    });
   }, [materialCostPerGram, filamentUsed, printTime, machineCostPerHour, electricityCostPerHour, laborCost, accessories, failureRate, packagingCost, shippingCost, profitMargin, gst]);
 
   const cardClass = "rounded-2xl border border-white/10 bg-slate-950/70 p-5 shadow-sm backdrop-blur-sm sm:p-6";
@@ -278,7 +275,7 @@ export default function SellerCalculatorPage() {
               <ResultRow label="Material cost" value={currency.format(values.materialCost)} />
               <ResultRow label="Machine cost" value={currency.format(values.machineCost)} />
               <ResultRow label="Electricity cost" value={currency.format(values.electricityCost)} />
-              <ResultRow label="Labor cost" value={currency.format(parseNumber(laborCost))} />
+              <ResultRow label="Labor cost" value={currency.format(values.laborCost)} />
               <ResultRow label="Accessories cost" value={currency.format(values.accessoriesCost)} />
               <ResultRow label="Packaging cost" value={currency.format(values.packagingCost)} />
               <ResultRow label="Shipping cost" value={currency.format(values.shippingCost)} />
