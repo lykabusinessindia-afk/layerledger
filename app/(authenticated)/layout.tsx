@@ -62,6 +62,7 @@ export default function AuthenticatedLayout({
     () => [
       { label: "Dashboard", href: "/dashboard" },
       { label: "Upload STL", href: "/calculator" },
+      { label: "Seller Calculator", href: "/seller-calculator" },
       { label: "Jobs", href: "/jobs" },
       { label: "Settings", href: "/settings" },
       { label: "Logout", action: handleLogout },
