@@ -451,7 +451,8 @@ export default function Calculator() {
         error?: string;
         details?: string;
         status?: number;
-        product?: { id?: number; handle?: string };
+        product?: { id?: number; handle?: string; variantId?: number };
+        cartUrl?: string;
       };
 
       console.log("Create product API response", {
@@ -467,19 +468,25 @@ export default function Calculator() {
         throw new Error(productData.details || productData.error || "Failed to create Shopify product");
       }
 
-      const handle = productData.product?.handle;
-      if (!handle) {
-        throw new Error("Shopify product handle missing from response");
+      const cartUrl = productData.cartUrl;
+      if (!cartUrl) {
+        throw new Error("Shopify cart/checkout URL missing from response");
       }
 
       console.log("Order This Print product created", {
         productId: productData.product?.id,
-        handle,
+        handle: productData.product?.handle,
+        variantId: productData.product?.variantId,
       });
+      console.log("Order This Print Variant ID:", productData.product?.variantId);
+      console.log("Order This Print Checkout URL:", cartUrl);
 
-      window.location.href = `/products/${handle}`;
+      window.location.href = cartUrl;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not create Shopify product.";
+      console.error("Order This Print failed", {
+        message,
+      });
       setOrderError(message);
     } finally {
       setIsOrdering(false);

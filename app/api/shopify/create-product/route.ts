@@ -43,7 +43,17 @@ const normalizeStoreUrl = (value: string) => {
   }
 
   const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  return withProtocol.replace(/\/$/, "");
+  try {
+    // Keep only origin so we never double-append /admin or other paths.
+    const parsed = new URL(withProtocol);
+    return parsed.origin;
+  } catch {
+    return withProtocol.replace(/\/$/, "");
+  }
+};
+
+const toCartCheckoutUrl = (storeUrl: string, variantId: number, quantity = 1) => {
+  return `${storeUrl}/cart/${variantId}:${quantity}`;
 };
 
 export async function POST(request: Request) {
@@ -132,7 +142,7 @@ export async function POST(request: Request) {
         );
       }
 
-      const responseJson = responseText ? (JSON.parse(responseText) as { product?: { id?: number; handle?: string } }) : {};
+      const responseJson = responseText ? (JSON.parse(responseText) as { product?: { id?: number; handle?: string; variants?: Array<{ id: number }> } }) : {};
       const product = responseJson.product;
 
       if (!product?.id || !product.handle) {
@@ -145,16 +155,37 @@ export async function POST(request: Request) {
         );
       }
 
+      const variantId = product.variants?.[0]?.id;
+      if (!variantId) {
+        return NextResponse.json(
+          {
+            error: "Shopify product created but variant ID is missing",
+            details: responseJson,
+          },
+          { status: 502 }
+        );
+      }
+
+      const cartUrl = toCartCheckoutUrl(storeUrl, variantId);
+
+      console.log("[create-product] Product created", { productId: product.id, handle: product.handle });
+      console.log("[create-product] Variant ID:", variantId);
+      console.log("[create-product] Checkout URL:", cartUrl);
+
       return NextResponse.json({
         success: true,
         product: {
           id: product.id,
           handle: product.handle,
+          variantId,
         },
+        cartUrl,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown Shopify fetch error";
-      console.error("Shopify create-product fetch error", message);
+      console.error("Shopify create-product fetch error", {
+        message,
+      });
       return NextResponse.json(
         {
           error: "Shopify API failed",
