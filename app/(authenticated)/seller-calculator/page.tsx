@@ -27,6 +27,8 @@ const defaultState = {
   electricityCostPerHour: "8",
   laborCost: "100",
   failureRate: "5",
+  packagingCost: "30",
+  shippingCost: "0",
   profitMargin: 30,
   gst: "18",
 };
@@ -42,6 +44,8 @@ export default function SellerCalculatorPage() {
   const [accessories, setAccessories] = useState<AccessoryItem[]>([
     { id: 1, name: "Nozzle wear", cost: "20" },
   ]);
+  const [packagingCost, setPackagingCost] = useState(defaultState.packagingCost);
+  const [shippingCost, setShippingCost] = useState(defaultState.shippingCost);
   const [profitMargin, setProfitMargin] = useState(defaultState.profitMargin);
   const [profitMarginInput, setProfitMarginInput] = useState(String(defaultState.profitMargin));
   const [gst, setGst] = useState(defaultState.gst);
@@ -80,6 +84,8 @@ export default function SellerCalculatorPage() {
     setLaborCost(defaultState.laborCost);
     setFailureRate(defaultState.failureRate);
     setAccessories([{ id: 1, name: "Nozzle wear", cost: "20" }]);
+    setPackagingCost(defaultState.packagingCost);
+    setShippingCost(defaultState.shippingCost);
     setProfitMargin(defaultState.profitMargin);
     setProfitMarginInput(String(defaultState.profitMargin));
     setGst(defaultState.gst);
@@ -90,15 +96,17 @@ export default function SellerCalculatorPage() {
     const machineCost = parseNumber(printTime) * parseNumber(machineCostPerHour);
     const electricityCost = parseNumber(printTime) * parseNumber(electricityCostPerHour);
     const accessoriesCost = accessories.reduce((sum, item) => sum + parseNumber(item.cost), 0);
-    const baseCost = materialCost + machineCost + electricityCost + parseNumber(laborCost) + accessoriesCost;
+    const packaging = parseNumber(packagingCost);
+    const shipping = parseNumber(shippingCost);
+    const baseCost = materialCost + machineCost + electricityCost + parseNumber(laborCost) + accessoriesCost + packaging + shipping;
     const safeFailureRate = Math.min(Math.max(parseNumber(failureRate), 0), 99);
     const adjustedCost = baseCost / (1 - safeFailureRate / 100);
     const profitAmount = adjustedCost * (profitMargin / 100);
     const finalPrice = adjustedCost + profitAmount;
     const gstAmount = finalPrice * (parseNumber(gst) / 100);
     const finalPriceWithGST = finalPrice + gstAmount;
-    return { materialCost, machineCost, electricityCost, accessoriesCost, baseCost, adjustedCost, profitAmount, finalPrice, gstAmount, finalPriceWithGST };
-  }, [materialCostPerGram, filamentUsed, printTime, machineCostPerHour, electricityCostPerHour, laborCost, accessories, failureRate, profitMargin, gst]);
+    return { materialCost, machineCost, electricityCost, accessoriesCost, packagingCost: packaging, shippingCost: shipping, baseCost, adjustedCost, profitAmount, finalPrice, gstAmount, finalPriceWithGST };
+  }, [materialCostPerGram, filamentUsed, printTime, machineCostPerHour, electricityCostPerHour, laborCost, accessories, failureRate, packagingCost, shippingCost, profitMargin, gst]);
 
   const cardClass = "rounded-2xl border border-white/10 bg-slate-950/70 p-5 shadow-sm backdrop-blur-sm sm:p-6";
   const inputClass = "mt-2 w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2.5 text-sm text-white outline-none transition focus:border-green-400/60 focus:ring-2 focus:ring-green-500/20";
@@ -214,6 +222,23 @@ export default function SellerCalculatorPage() {
             </div>
           </section>
 
+          {/* Packaging & Misc */}
+          <section className={cardClass}>
+            <h2 className="text-lg font-bold text-white">Packaging &amp; Misc</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="text-sm text-slate-300">
+                Packaging cost (₹)
+                <input type="number" min="0" step="0.01" value={packagingCost}
+                  onChange={(e) => setPackagingCost(e.target.value)} className={inputClass} />
+              </label>
+              <label className="text-sm text-slate-300">
+                Shipping cost (₹) <span className="text-slate-500">(optional)</span>
+                <input type="number" min="0" step="0.01" value={shippingCost}
+                  onChange={(e) => setShippingCost(e.target.value)} className={inputClass} />
+              </label>
+            </div>
+          </section>
+
           {/* Pricing Settings */}
           <section className={cardClass}>
             <h2 className="text-lg font-bold text-white">Pricing Settings</h2>
@@ -255,6 +280,8 @@ export default function SellerCalculatorPage() {
               <ResultRow label="Electricity cost" value={currency.format(values.electricityCost)} />
               <ResultRow label="Labor cost" value={currency.format(parseNumber(laborCost))} />
               <ResultRow label="Accessories cost" value={currency.format(values.accessoriesCost)} />
+              <ResultRow label="Packaging cost" value={currency.format(values.packagingCost)} />
+              <ResultRow label="Shipping cost" value={currency.format(values.shippingCost)} />
               <div className="my-2 border-t border-white/10" />
               <ResultRow label="Base cost" value={currency.format(values.baseCost)} />
               <ResultRow label="Adjusted cost (failure)" value={currency.format(values.adjustedCost)} />
