@@ -56,7 +56,7 @@ export default function Login() {
   };
 
   const handleGoogleLogin = async () => {
-    const oauthPath = "/api/auth/signin/google";
+    const oauthPath = "/api/auth/signin/google?callbackUrl=/calculator";
     const topWindow = window.top;
 
     if (topWindow && topWindow !== window.self) {
@@ -70,12 +70,18 @@ export default function Login() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const oauthProvider = params.get("oauth");
+    const callbackUrlParam = params.get("callbackUrl") ?? "/calculator";
+    const safeCallbackPath =
+      callbackUrlParam.startsWith("/") && !callbackUrlParam.startsWith("//")
+        ? callbackUrlParam
+        : "/calculator";
+
     if (oauthProvider !== "google") return;
 
     void supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/calculator`,
+        redirectTo: `${window.location.origin}${safeCallbackPath}`,
       },
     });
   }, []);

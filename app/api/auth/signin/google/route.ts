@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 
-export async function GET() {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+export async function GET(request: Request) {
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const url = new URL(request.url);
+  const callbackUrlParam = url.searchParams.get("callbackUrl") ?? "/calculator";
 
-  if (!siteUrl) {
-    return NextResponse.json(
-      { success: false, error: "Missing NEXT_PUBLIC_SITE_URL" },
-      { status: 500 }
-    );
-  }
+  const safeCallbackUrl =
+    callbackUrlParam.startsWith("/") && !callbackUrlParam.startsWith("//")
+      ? callbackUrlParam
+      : "/calculator";
 
-  const target = `${siteUrl.replace(/\/$/, "")}/login?oauth=google`;
-  return NextResponse.redirect(target);
+  const loginUrl = new URL("/login", baseUrl);
+  loginUrl.searchParams.set("oauth", "google");
+  loginUrl.searchParams.set("callbackUrl", safeCallbackUrl);
+
+  return NextResponse.redirect(loginUrl);
 }

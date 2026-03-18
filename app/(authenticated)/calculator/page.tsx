@@ -429,7 +429,9 @@ export default function Calculator() {
       const selectedColorName =
         COLOR_OPTIONS.find((option) => option.value === filamentColor)?.name ?? filamentColor;
 
-      const createProductResponse = await fetch("/api/shopify/create-product", {
+      console.log("Order This Print starting create-product API call");
+
+      const createProductResponse = await fetch("/api/create-product", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -445,10 +447,11 @@ export default function Calculator() {
       });
 
       const productData = (await createProductResponse.json()) as {
+        success?: boolean;
         error?: string;
         details?: string;
         status?: number;
-        product?: { handle?: string };
+        product?: { id?: number; handle?: string };
       };
 
       console.log("Create product API response", {
@@ -469,11 +472,12 @@ export default function Calculator() {
         throw new Error("Shopify product handle missing from response");
       }
 
-      const storefrontBase = (process.env.NEXT_PUBLIC_SHOPIFY_STORE ?? "https://lyka3dstudio.com")
-        .trim()
-        .replace(/\/$/, "");
+      console.log("Order This Print product created", {
+        productId: productData.product?.id,
+        handle,
+      });
 
-      window.location.href = `${storefrontBase}/products/${handle}`;
+      window.location.href = `/products/${handle}`;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not create Shopify product.";
       setOrderError(message);

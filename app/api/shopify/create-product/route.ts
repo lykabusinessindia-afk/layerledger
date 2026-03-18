@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
 type CreateProductRequest = {
-  title: string;
+  title?: string;
   price: string;
-  weight: string;
-  time: string;
-  material: string;
-  stlUrl: string;
+  weight?: string;
+  time?: string;
+  material?: string;
+  stlUrl?: string;
 };
 
 const escapeHtml = (value: string) =>
@@ -18,11 +18,11 @@ const escapeHtml = (value: string) =>
     .replace(/'/g, "&#39;");
 
 const buildProductBodyHtml = (payload: CreateProductRequest) => {
-  const title = escapeHtml(payload.title);
-  const weight = escapeHtml(payload.weight);
-  const time = escapeHtml(payload.time);
-  const material = escapeHtml(payload.material);
-  const stlUrl = escapeHtml(payload.stlUrl);
+  const title = escapeHtml(payload.title ?? "3D Print Order");
+  const weight = escapeHtml(payload.weight ?? "Not provided");
+  const time = escapeHtml(payload.time ?? "Not provided");
+  const material = escapeHtml(payload.material ?? "Not provided");
+  const stlUrl = escapeHtml(payload.stlUrl ?? "");
 
   return `
     <h2>${title}</h2>
@@ -31,7 +31,7 @@ const buildProductBodyHtml = (payload: CreateProductRequest) => {
       <li><strong>Estimated weight:</strong> ${weight}</li>
       <li><strong>Estimated print time:</strong> ${time}</li>
       <li><strong>Material:</strong> ${material}</li>
-      <li><strong>STL file:</strong> <a href="${stlUrl}" target="_blank" rel="noopener noreferrer">View uploaded model</a></li>
+      ${stlUrl ? `<li><strong>STL file:</strong> <a href="${stlUrl}" target="_blank" rel="noopener noreferrer">View uploaded model</a></li>` : ""}
     </ul>
   `.trim();
 };
@@ -49,7 +49,7 @@ const normalizeStoreUrl = (value: string) => {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Partial<CreateProductRequest>;
-    console.log("Shopify create-product request body", body);
+    console.log("[create-product] incoming request", body);
 
     const storeUrl = normalizeStoreUrl(process.env.SHOPIFY_STORE_URL ?? "");
     const accessToken = process.env.SHOPIFY_ACCESS_TOKEN?.trim() ?? "";
@@ -68,32 +68,32 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!body.title || !body.price || !body.weight || !body.time || !body.material || !body.stlUrl) {
+    if (!body.price) {
       return NextResponse.json(
-        { error: "Missing required fields: title, price, weight, time, material, stlUrl" },
+        { error: "Missing required field: price" },
         { status: 400 }
       );
     }
 
     const payload = {
       product: {
-        title: body.title,
-        body_html: buildProductBodyHtml(body as CreateProductRequest),
-        vendor: "LYKA 3D Studio",
+        title: body.title ?? "3D Print Order",
+        body_html: body.stlUrl || body.material || body.time || body.weight
+          ? buildProductBodyHtml(body as CreateProductRequest)
+          : "Custom STL print",
+        vendor: "LayerLedger",
         product_type: "3D Print",
         variants: [
           {
             price: body.price,
-            inventory_management: "shopify",
-            inventory_quantity: 1,
           },
         ],
       },
     };
 
-    const endpoint = new URL("/admin/api/2024-01/products.json", storeUrl);
-    console.log("Shopify create-product before API call", {
-      endpoint: endpoint.toString(),
+    const endpoint = `${storeUrl}/admin/api/2024-01/products.json`;
+    console.log("[create-product] Shopify API request", {
+      endpoint,
       payload,
     });
 
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
 
       const responseText = await shopifyResponse.text();
 
-      console.log("Shopify create-product after API call", {
+      console.log("[create-product] Shopify API response", {
         status: shopifyResponse.status,
         body: responseText,
       });
@@ -132,12 +132,26 @@ export async function POST(request: Request) {
         );
       }
 
-      try {
-        const responseJson = responseText ? JSON.parse(responseText) : {};
-        return NextResponse.json(responseJson);
-      } catch {
-        return NextResponse.json({ raw: responseText });
+      const responseJson = responseText ? (JSON.parse(responseText) as { product?: { id?: number; handle?: string } }) : {};
+      const product = responseJson.product;
+
+      if (!product?.id || !product.handle) {
+        return NextResponse.json(
+          {
+            error: "Shopify product created but response missing id/handle",
+            details: responseJson,
+          },
+          { status: 502 }
+        );
       }
+
+      return NextResponse.json({
+        success: true,
+        product: {
+          id: product.id,
+          handle: product.handle,
+        },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown Shopify fetch error";
       console.error("Shopify create-product fetch error", message);
