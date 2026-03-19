@@ -84,24 +84,7 @@ const TOP_BOTTOM_FACTOR = 0.15;     // top and bottom solid layers
 const SUPPORTS_FACTOR = 0.05;       // estimated support material
 const SLICER_EFFICIENCY_FACTOR = 0.65; // extrusion path efficiency vs raw volume
 
-type MaterialType = "PLA" | "PLA Silk" | "PETG" | "ABS" | "ASA" | "TPU";
-type PrintQuality = "Draft" | "Standard" | "High";
-type SizeUnit = "mm" | "cm" | "inch";
-
-const QUALITY_MULTIPLIER: Record<PrintQuality, number> = {
-  Draft: 0.8,
-  Standard: 1,
-  High: 1.3,
-};
-
-const MATERIAL_COST_PER_GRAM: Record<MaterialType, number> = {
-  PLA: 3,
-  "PLA Silk": 3.5,
-  PETG: 4,
-  ABS: 3.5,
-  ASA: 3.8,
-  TPU: 6,
-};
+type MaterialType = "PLA" | "PETG" | "ABS" | "TPU" | "ASA" | "PLA+";
 
 const MATERIAL_LIBRARY: Record<
   MaterialType,
@@ -119,13 +102,6 @@ const MATERIAL_LIBRARY: Record<
     defaultSpeed: 60,
     temperature: "200-210 degC",
     badgeClass: "bg-green-500/20 text-green-300 border-green-400/30",
-  },
-  "PLA Silk": {
-    name: "PLA Silk",
-    density: 1.24,
-    defaultSpeed: 55,
-    temperature: "205-220 degC",
-    badgeClass: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/30",
   },
   PETG: {
     name: "PETG",
@@ -155,6 +131,13 @@ const MATERIAL_LIBRARY: Record<
     temperature: "240-260 degC",
     badgeClass: "bg-orange-500/20 text-orange-300 border-orange-400/30",
   },
+  "PLA+": {
+    name: "PLA+",
+    density: 1.24,
+    defaultSpeed: 65,
+    temperature: "205-220 degC",
+    badgeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30",
+  },
 };
 
 const COLOR_OPTIONS = [
@@ -166,18 +149,6 @@ const COLOR_OPTIONS = [
   { name: "Yellow", value: "#eab308" },
   { name: "Orange", value: "#f97316" },
   { name: "Gray", value: "#9ca3af" },
-  { name: "Purple", value: "#7c3aed" },
-  { name: "Pink", value: "#ec4899" },
-  { name: "Gold", value: "#d4af37" },
-  { name: "Silver", value: "#c0c0c0" },
-  { name: "Transparent", value: "#e5e7eb" },
-  { name: "Wood", value: "#8b5a2b" },
-];
-
-const PLA_SILK_COLOR_OPTIONS = [
-  { name: "Silk Gold", value: "#d4af37" },
-  { name: "Silk Silver", value: "#c0c0c0" },
-  { name: "Silk Rainbow", value: "#ff4dc4" },
 ];
 
 export default function Calculator() {
@@ -197,13 +168,7 @@ export default function Calculator() {
 
   const [materialType, setMaterialType] = useState<MaterialType>("PLA");
   const [filamentColor, setFilamentColor] = useState("#00ff88");
-  const [selectedPrinter] = useState(PRINTER_OPTIONS[0].name);
-  const [sizeX, setSizeX] = useState("");
-  const [sizeY, setSizeY] = useState("");
-  const [sizeZ, setSizeZ] = useState("");
-  const [sizeUnit, setSizeUnit] = useState<SizeUnit>("mm");
-  const [manualWeight, setManualWeight] = useState("");
-  const [printQuality, setPrintQuality] = useState<PrintQuality>("Standard");
+  const [selectedPrinter, setSelectedPrinter] = useState(PRINTER_OPTIONS[0].name);
 
   const [models, setModels] = useState<ViewerModel[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -219,16 +184,6 @@ export default function Calculator() {
   const [orderError, setOrderError] = useState("");
   const [isOrdering, setIsOrdering] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const modelVolumeRef = useRef(0);
-  const modelDimensionsRef = useRef({ width: 0, depth: 0, height: 0 });
-
-  useEffect(() => {
-    modelVolumeRef.current = modelVolume;
-  }, [modelVolume]);
-
-  useEffect(() => {
-    modelDimensionsRef.current = modelDimensions;
-  }, [modelDimensions]);
 
   const parseNumber = (value: string) => {
     const parsed = parseFloat(value);
@@ -292,60 +247,24 @@ export default function Calculator() {
     setEstimatedPrintTime(0);
     setModelDimensions({ width: 0, depth: 0, height: 0 });
     setFilamentUsed("0.00");
-    setManualWeight("");
-    setSizeX("");
-    setSizeY("");
-    setSizeZ("");
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
-  const handleAnalysisChange = useCallback((payload?: {
+  const handleAnalysisChange = useCallback((payload: {
     totalVolumeCm3: number;
     dimensionsMm: { width: number; depth: number; height: number };
   }) => {
-    if (!payload) return;
-
-    const volumeUnchanged = payload.totalVolumeCm3 === modelVolumeRef.current;
-    const dims = payload.dimensionsMm;
-    const prevDims = modelDimensionsRef.current;
-    const dimensionsUnchanged =
-      dims.width === prevDims.width &&
-      dims.depth === prevDims.depth &&
-      dims.height === prevDims.height;
-
-    if (volumeUnchanged && dimensionsUnchanged) {
-      return;
-    }
-
-    if (!volumeUnchanged) {
-      modelVolumeRef.current = payload.totalVolumeCm3;
-      setModelVolume(payload.totalVolumeCm3);
-    }
-
-    if (!dimensionsUnchanged) {
-      modelDimensionsRef.current = dims;
-      setModelDimensions(dims);
-    }
+    setModelVolume(payload.totalVolumeCm3);
+    setModelDimensions(payload.dimensionsMm);
   }, []);
 
   const selectedMaterialConfig = useMemo(
     () => MATERIAL_LIBRARY[materialType],
     [materialType]
   );
-
-  const availableColorOptions = useMemo(
-    () => (materialType === "PLA Silk" ? PLA_SILK_COLOR_OPTIONS : COLOR_OPTIONS),
-    [materialType]
-  );
-
-  useEffect(() => {
-    if (!availableColorOptions.some((option) => option.value === filamentColor)) {
-      setFilamentColor(availableColorOptions[0]?.value ?? "#ffffff");
-    }
-  }, [availableColorOptions, filamentColor]);
 
   useEffect(() => {
     const profile = PRINTER_PROFILES[selectedPrinter];
@@ -356,28 +275,10 @@ export default function Calculator() {
     setMachineCostPerHour(String(profile.machineCostPerHour));
   }, [selectedPrinter]);
 
-  const sizeMultiplier = useMemo(() => {
-    if (sizeUnit === "cm") return 10;
-    if (sizeUnit === "inch") return 25.4;
-    return 1;
-  }, [sizeUnit]);
-
-  const customVolumeCm3 = useMemo(() => {
-    const x = parseNumber(sizeX) * sizeMultiplier;
-    const y = parseNumber(sizeY) * sizeMultiplier;
-    const z = parseNumber(sizeZ) * sizeMultiplier;
-    if (x <= 0 || y <= 0 || z <= 0) return 0;
-    return (x * y * z) / 1000;
-  }, [sizeX, sizeY, sizeZ, sizeMultiplier]);
-
-  const effectiveModelVolumeCm3 = customVolumeCm3 > 0 ? customVolumeCm3 : modelVolume;
-
-  const manualWeightNum = useMemo(() => parseNumber(manualWeight), [manualWeight]);
-
-  // Filament estimation — recalculates on model/custom size and material.
+  // Filament estimation — only recalculates on model change, material change, or printer profile change.
   // This prevents the weight from fluctuating when unrelated UI fields (speed, price, etc.) are edited.
   useEffect(() => {
-    if (effectiveModelVolumeCm3 <= 0) {
+    if (modelVolume <= 0) {
       setFilamentUsed("0.00");
       return;
     }
@@ -385,10 +286,10 @@ export default function Calculator() {
     const infillPercentage = DEFAULT_INFILL_PERCENTAGE;
     const materialDensity = MATERIAL_LIBRARY[materialType]?.density ?? 1.24;
 
-    const wallsVolume    = effectiveModelVolumeCm3 * WALLS_FACTOR;
-    const infillVolume   = effectiveModelVolumeCm3 * infillPercentage;
-    const topBotVolume   = effectiveModelVolumeCm3 * TOP_BOTTOM_FACTOR;
-    const supportsVolume = effectiveModelVolumeCm3 * SUPPORTS_FACTOR;
+    const wallsVolume    = modelVolume * WALLS_FACTOR;
+    const infillVolume   = modelVolume * infillPercentage;
+    const topBotVolume   = modelVolume * TOP_BOTTOM_FACTOR;
+    const supportsVolume = modelVolume * SUPPORTS_FACTOR;
 
     const bodyVolume = wallsVolume + infillVolume + topBotVolume;
     const effectiveVolume = bodyVolume + supportsVolume;
@@ -397,23 +298,21 @@ export default function Calculator() {
     const filamentWeight    = Math.round(rawFilamentWeight * SLICER_EFFICIENCY_FACTOR * 100) / 100;
 
     setFilamentUsed(filamentWeight.toFixed(2));
-  }, [effectiveModelVolumeCm3, materialType, selectedPrinter]);
+  }, [modelVolume, materialType, selectedPrinter]);
 
   // Print-time estimation — recalculates on model or speed change only.
   useEffect(() => {
-    if (effectiveModelVolumeCm3 <= 0) {
+    if (modelVolume <= 0) {
       setEstimatedPrintTime(0);
       return;
     }
-    const volumeMm3 = effectiveModelVolumeCm3 * 1000;
+    const volumeMm3 = modelVolume * 1000;
     const selectedSpeed = Math.max(parseNumber(printSpeedMmPerSecond), 1);
     const baseFlowRate = 12; // mm³/s at 60 mm/s baseline speed
     const flowRateMm3PerSecond = Math.max(1, baseFlowRate * (selectedSpeed / 60));
     const estimatedHours = volumeMm3 / flowRateMm3PerSecond / 3600;
     setEstimatedPrintTime(estimatedHours);
-  }, [effectiveModelVolumeCm3, printSpeedMmPerSecond]);
-
-  const effectiveWeight = manualWeightNum > 0 ? manualWeightNum : parseNumber(filamentUsed);
+  }, [modelVolume, printSpeedMmPerSecond]);
 
   const {
     filamentCost,
@@ -421,8 +320,8 @@ export default function Calculator() {
     machineCost,
     totalProductionCost,
   } = useMemo(() => {
-    const filamentUsedNum = effectiveWeight;
-    const materialCostPerGram = MATERIAL_COST_PER_GRAM[materialType];
+    const filamentUsedNum = parseNumber(filamentUsed);
+    const filamentPriceNum = parseNumber(filamentPricePerKg);
     const printHoursNum = Math.max(estimatedPrintTime, 0);
     const electricityRateNum = parseNumber(electricityRate);
     const machinePowerNum = parseNumber(machinePowerWatts);
@@ -430,7 +329,7 @@ export default function Calculator() {
     const packagingCostNum = parseNumber(packagingCost);
     const shippingCostNum = parseNumber(shippingCost);
 
-    const filamentCost = filamentUsedNum * materialCostPerGram;
+    const filamentCost = (filamentUsedNum / 1000) * filamentPriceNum;
 
     const electricityCost =
       (machinePowerNum / 1000) * printHoursNum * electricityRateNum;
@@ -438,7 +337,7 @@ export default function Calculator() {
     const machineCost = machineCostPerHourNum * printHoursNum;
 
     const breakdown = calculatePricingBreakdown({
-      materialCostPerGram,
+      materialCostPerGram: filamentUsedNum > 0 ? filamentCost / filamentUsedNum : 0,
       filamentUsedGrams: filamentUsedNum,
       printTimeHours: printHoursNum,
       machineCostPerHour: machineCostPerHourNum,
@@ -459,8 +358,8 @@ export default function Calculator() {
       totalProductionCost: breakdown.baseCost,
     };
   }, [
-    effectiveWeight,
-    materialType,
+    filamentUsed,
+    filamentPricePerKg,
     estimatedPrintTime,
     electricityRate,
     machinePowerWatts,
@@ -471,11 +370,10 @@ export default function Calculator() {
 
   const instantPriceQuote = useMemo(() => {
     const profitMarginNum = parseNumber(profitMargin);
-    return totalProductionCost * (1 + profitMarginNum / 100) * QUALITY_MULTIPLIER[printQuality];
+    return totalProductionCost * (1 + profitMarginNum / 100);
   }, [
     totalProductionCost,
     profitMargin,
-    printQuality,
   ]);
 
   const selectedPrinterDetails = useMemo(
@@ -487,34 +385,6 @@ export default function Calculator() {
     () => models.find((model) => model.id === selectedModelId) ?? null,
     [models, selectedModelId]
   );
-
-  const visualScaleFromCustomSize = useMemo(() => {
-    const x = parseNumber(sizeX) * sizeMultiplier;
-    const y = parseNumber(sizeY) * sizeMultiplier;
-    const z = parseNumber(sizeZ) * sizeMultiplier;
-
-    if (x <= 0 || y <= 0 || z <= 0) return null;
-    if (modelDimensions.width <= 0 || modelDimensions.depth <= 0 || modelDimensions.height <= 0) return null;
-
-    const sx = x / modelDimensions.width;
-    const sy = y / modelDimensions.depth;
-    const sz = z / modelDimensions.height;
-    const averageScale = (sx + sy + sz) / 3;
-
-    if (!Number.isFinite(averageScale) || averageScale <= 0) return null;
-    return Math.max(0.1, Math.min(averageScale, 10));
-  }, [sizeX, sizeY, sizeZ, sizeMultiplier, modelDimensions]);
-
-  useEffect(() => {
-    if (!selectedModel || visualScaleFromCustomSize === null) return;
-    if (Math.abs(selectedModel.scale - visualScaleFromCustomSize) < 0.001) return;
-
-    setModels((prev) => prev.map((model) => (
-      model.id === selectedModel.id
-        ? { ...model, scale: visualScaleFromCustomSize }
-        : model
-    )));
-  }, [selectedModel, visualScaleFromCustomSize]);
 
   const handleOrderThisPrint = async () => {
     if (!selectedModel) {
@@ -605,6 +475,21 @@ export default function Calculator() {
     }
   };
 
+  const analysisCards = [
+    {
+      label: "Estimated Filament Usage (±10% accuracy)",
+      value: `${filamentUsed || "0.00"} g`,
+    },
+    {
+      label: "Dimensions",
+      value: `${modelDimensions.width.toFixed(2)} × ${modelDimensions.depth.toFixed(2)} × ${modelDimensions.height.toFixed(2)} mm`,
+    },
+    {
+      label: "Print Time",
+      value: `${estimatedPrintTime.toFixed(2)} hrs`,
+    },
+  ];
+
   return (
     <div className="layerledger-content mx-auto max-w-4xl space-y-5">
       <section className="rounded-[28px] border border-black/10 bg-white/80 p-6 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_30px_80px_rgba(0,0,0,0.35)] md:p-8">
@@ -614,7 +499,7 @@ export default function Calculator() {
         </p>
       </section>
 
-      <section className={`rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl transition-all duration-300 dark:border-white/10 dark:bg-slate-950/70 ${models.length > 0 ? "" : "mx-auto max-w-2xl"}`}>
+      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Upload Model</p>
         <h2 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">STL / OBJ / 3MF Upload</h2>
         <label className="mt-4 flex items-start gap-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
@@ -652,80 +537,39 @@ export default function Calculator() {
 
       <div className="text-center text-sm font-semibold text-slate-400">↓</div>
 
-      <section className={`rounded-[24px] border border-black/10 bg-white/80 p-5 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl transition-all duration-300 dark:border-white/10 dark:bg-slate-950/70 ${models.length > 0 ? "" : "mx-auto max-w-2xl"}`}>
+      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">3D Model Preview</p>
-        {models.length > 0 ? (
-          <>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Interactive preview: drag to rotate, scroll to zoom, and right-drag to pan.</p>
-            <div className="mt-4 rounded-[22px] border border-black/10 bg-slate-100/80 p-3 dark:border-white/8 dark:bg-slate-900/70 md:p-4">
-              <STLViewer
-                models={models}
-                selectedModelId={selectedModelId}
-                filamentColor={filamentColor}
-                simpleView
-                buildPlate={{
-                  width: selectedPrinterDetails.buildVolume.width,
-                  depth: selectedPrinterDetails.buildVolume.depth,
-                }}
-                onAnalysisChange={handleAnalysisChange}
-              />
-            </div>
-          </>
-        ) : (
-          <div className="mt-4 rounded-2xl border border-dashed border-black/15 bg-slate-100/70 px-4 py-6 text-center text-sm font-medium text-slate-600 transition-all duration-300 dark:border-white/15 dark:bg-slate-900/50 dark:text-slate-300">
-            Upload STL to preview your model
-          </div>
-        )}
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Preview only. Your model is auto-positioned for quoting.</p>
+        <div className="mt-4 rounded-[22px] border border-black/10 bg-slate-100/80 p-3 dark:border-white/8 dark:bg-slate-900/70 md:p-4">
+          <STLViewer
+            models={models}
+            selectedModelId={selectedModelId}
+            filamentColor={filamentColor}
+            simpleView
+            buildPlate={{
+              width: selectedPrinterDetails.buildVolume.width,
+              depth: selectedPrinterDetails.buildVolume.depth,
+            }}
+            onAnalysisChange={handleAnalysisChange}
+          />
+        </div>
       </section>
 
       <div className="text-center text-sm font-semibold text-slate-400">↓</div>
 
       <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Size Scaling</p>
-          <select
-            value={sizeUnit}
-            onChange={(e) => setSizeUnit(e.target.value as SizeUnit)}
-            className="w-[120px] rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white"
-          >
-            <option value="mm">mm</option>
-            <option value="cm">cm</option>
-            <option value="inch">inches</option>
-          </select>
-        </div>
-
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            <span className="mb-1.5 block">X</span>
-            <input
-              type="number"
-              value={sizeX}
-              onChange={(e) => setSizeX(e.target.value)}
-              placeholder="Width"
-              className="w-full rounded-2xl border border-black/10 bg-white px-3 py-3 text-sm text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white"
-            />
-          </label>
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            <span className="mb-1.5 block">Y</span>
-            <input
-              type="number"
-              value={sizeY}
-              onChange={(e) => setSizeY(e.target.value)}
-              placeholder="Depth"
-              className="w-full rounded-2xl border border-black/10 bg-white px-3 py-3 text-sm text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white"
-            />
-          </label>
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            <span className="mb-1.5 block">Z</span>
-            <input
-              type="number"
-              value={sizeZ}
-              onChange={(e) => setSizeZ(e.target.value)}
-              placeholder="Height"
-              className="w-full rounded-2xl border border-black/10 bg-white px-3 py-3 text-sm text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white"
-            />
-          </label>
-        </div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Printer Selection</p>
+        <select
+          value={selectedPrinter}
+          onChange={(e) => setSelectedPrinter(e.target.value)}
+          className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-3 text-sm text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white"
+        >
+          {PRINTER_OPTIONS.map((printer) => (
+            <option key={printer.name} value={printer.name}>
+              {printer.name} - {printer.buildVolume.width} × {printer.buildVolume.depth} × {printer.buildVolume.height} mm
+            </option>
+          ))}
+        </select>
       </section>
 
       <div className="text-center text-sm font-semibold text-slate-400">↓</div>
@@ -750,7 +594,7 @@ export default function Calculator() {
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Filament Color</p>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {availableColorOptions.map((option) => (
+            {COLOR_OPTIONS.map((option) => (
               <button
                 key={option.value}
                 type="button"
@@ -771,37 +615,15 @@ export default function Calculator() {
 
       <div className="text-center text-sm font-semibold text-slate-400">↓</div>
 
-      <section className="grid gap-5 rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 md:grid-cols-2">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Approx Weight (grams)</p>
-          <input
-            type="number"
-            value={manualWeight}
-            onChange={(e) => setManualWeight(e.target.value)}
-            placeholder="Weight in grams"
-            className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-3 text-sm text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
-
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Print Quality</p>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {(["Draft", "Standard", "High"] as PrintQuality[]).map((quality) => (
-              <button
-                key={quality}
-                type="button"
-                onClick={() => setPrintQuality(quality)}
-                className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${
-                  printQuality === quality
-                    ? "border-green-500/50 bg-green-50 text-green-700 dark:border-green-400/40 dark:bg-green-500/10 dark:text-green-300"
-                    : "border-black/10 bg-white text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
-                }`}
-              >
-                {quality}
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Draft 0.8x, Standard 1x, High 1.3x</p>
+      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Model Analysis</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {analysisCards.map((item) => (
+            <div key={item.label} className="rounded-xl border border-black/10 bg-slate-100/80 p-3.5 dark:border-white/8 dark:bg-slate-900/80">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{item.label}</p>
+              <p className="mt-1.5 text-base font-semibold text-slate-900 dark:text-white">{item.value}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -812,6 +634,21 @@ export default function Calculator() {
         <div className="mt-4 rounded-2xl border border-black/10 bg-white/80 p-5 text-center dark:border-white/10 dark:bg-black/20">
           <p className="text-xs uppercase tracking-[0.24em] text-emerald-800/70 dark:text-green-200/70">Estimated Quote</p>
           <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">₹{instantPriceQuote.toFixed(2)}</p>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+          <div className="rounded-xl border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-black/20">
+            <p className="text-[10px] text-slate-500 dark:text-green-100/70">Filament</p>
+            <p className="mt-1 font-semibold text-slate-900 dark:text-white">₹ {filamentCost.toFixed(2)}</p>
+          </div>
+          <div className="rounded-xl border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-black/20">
+            <p className="text-[10px] text-slate-500 dark:text-green-100/70">Electricity</p>
+            <p className="mt-1 font-semibold text-slate-900 dark:text-white">₹ {electricityCost.toFixed(2)}</p>
+          </div>
+          <div className="rounded-xl border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-black/20">
+            <p className="text-[10px] text-slate-500 dark:text-green-100/70">Machine</p>
+            <p className="mt-1 font-semibold text-slate-900 dark:text-white">₹ {machineCost.toFixed(2)}</p>
+          </div>
         </div>
 
         <button
