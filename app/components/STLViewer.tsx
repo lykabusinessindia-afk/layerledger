@@ -494,7 +494,9 @@ export default function STLViewer({
   const onSelectModelRef = useRef(onSelectModel);
   const onModelPositionChangeRef = useRef(onModelPositionChange);
   const onModelFootprintsChangeRef = useRef(onModelFootprintsChange);
-  const analysisRef = useRef(onAnalysisChange);
+  const callbackRef = useRef(onAnalysisChange);
+  const hasAnalyzedRef = useRef(false);
+  const lastModelInputKeyRef = useRef("");
   const lastAnalysisRef = useRef<{
     totalVolumeCm3: number;
     dimensionsMm: { width: number; depth: number; height: number };
@@ -528,8 +530,8 @@ export default function STLViewer({
   }, [onModelFootprintsChange]);
 
   useEffect(() => {
-    analysisRef.current = onAnalysisChange;
-  }, [onAnalysisChange]);
+    callbackRef.current = onAnalysisChange;
+  }, []);
 
   const analysisChanged = useCallback((next: {
     totalVolumeCm3: number;
@@ -956,9 +958,9 @@ export default function STLViewer({
           dimensionsMm: { width: 0, depth: 0, height: 0 },
         };
 
-        if (analysisRef.current && analysisChanged(emptyAnalysis)) {
+        if (callbackRef.current && analysisChanged(emptyAnalysis)) {
           lastAnalysisRef.current = emptyAnalysis;
-          analysisRef.current(emptyAnalysis);
+          callbackRef.current(emptyAnalysis);
         }
 
         camera.position.copy(CAMERA_HOME);
@@ -991,9 +993,9 @@ export default function STLViewer({
         },
       };
 
-      if (analysisRef.current && analysisChanged(nextAnalysis)) {
+      if (callbackRef.current && analysisChanged(nextAnalysis)) {
         lastAnalysisRef.current = nextAnalysis;
-        analysisRef.current(nextAnalysis);
+        callbackRef.current(nextAnalysis);
       }
 
       const center = aggregateBox.getCenter(new THREE.Vector3());
@@ -1127,9 +1129,19 @@ export default function STLViewer({
       applyTransformsAndAnalyze();
     };
 
+    const modelInputKey = models.map((model) => model.id).join("|");
+    if (lastModelInputKeyRef.current !== modelInputKey) {
+      lastModelInputKeyRef.current = modelInputKey;
+      hasAnalyzedRef.current = false;
+    }
+
+    if (hasAnalyzedRef.current) {
+      return;
+    }
+
+    hasAnalyzedRef.current = true;
     void loadMissingModels();
-    applyTransformsAndAnalyze();
-  }, [models, selectedModelId, buildPlate.width, buildPlate.depth, simpleView, analysisChanged]);
+  }, [models]);
 
   useEffect(() => {
     if (modelMapRef.current.size === 0) return;
