@@ -219,8 +219,16 @@ export default function Calculator() {
   const [orderError, setOrderError] = useState("");
   const [isOrdering, setIsOrdering] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modelVolumeRef = useRef(0);
+  const modelDimensionsRef = useRef({ width: 0, depth: 0, height: 0 });
 
-  const roughlyEqual = (a: number, b: number, epsilon = 0.01) => Math.abs(a - b) <= epsilon;
+  useEffect(() => {
+    modelVolumeRef.current = modelVolume;
+  }, [modelVolume]);
+
+  useEffect(() => {
+    modelDimensionsRef.current = modelDimensions;
+  }, [modelDimensions]);
 
   const parseNumber = (value: string) => {
     const parsed = parseFloat(value);
@@ -300,19 +308,27 @@ export default function Calculator() {
   }) => {
     if (!payload) return;
 
-    setModelVolume((prev) => (
-      roughlyEqual(prev, payload.totalVolumeCm3) ? prev : payload.totalVolumeCm3
-    ));
+    const volumeUnchanged = payload.totalVolumeCm3 === modelVolumeRef.current;
+    const dims = payload.dimensionsMm;
+    const prevDims = modelDimensionsRef.current;
+    const dimensionsUnchanged =
+      dims.width === prevDims.width &&
+      dims.depth === prevDims.depth &&
+      dims.height === prevDims.height;
 
-    setModelDimensions((prev) => {
-      const next = payload.dimensionsMm;
-      const unchanged =
-        roughlyEqual(prev.width, next.width) &&
-        roughlyEqual(prev.depth, next.depth) &&
-        roughlyEqual(prev.height, next.height);
+    if (volumeUnchanged && dimensionsUnchanged) {
+      return;
+    }
 
-      return unchanged ? prev : next;
-    });
+    if (!volumeUnchanged) {
+      modelVolumeRef.current = payload.totalVolumeCm3;
+      setModelVolume(payload.totalVolumeCm3);
+    }
+
+    if (!dimensionsUnchanged) {
+      modelDimensionsRef.current = dims;
+      setModelDimensions(dims);
+    }
   }, []);
 
   const selectedMaterialConfig = useMemo(

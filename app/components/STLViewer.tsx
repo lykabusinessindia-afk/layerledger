@@ -494,7 +494,7 @@ export default function STLViewer({
   const onSelectModelRef = useRef(onSelectModel);
   const onModelPositionChangeRef = useRef(onModelPositionChange);
   const onModelFootprintsChangeRef = useRef(onModelFootprintsChange);
-  const onAnalysisChangeRef = useRef(onAnalysisChange);
+  const analysisRef = useRef(onAnalysisChange);
   const lastAnalysisRef = useRef<{
     totalVolumeCm3: number;
     dimensionsMm: { width: number; depth: number; height: number };
@@ -528,7 +528,7 @@ export default function STLViewer({
   }, [onModelFootprintsChange]);
 
   useEffect(() => {
-    onAnalysisChangeRef.current = onAnalysisChange;
+    analysisRef.current = onAnalysisChange;
   }, [onAnalysisChange]);
 
   const analysisChanged = useCallback((next: {
@@ -956,9 +956,9 @@ export default function STLViewer({
           dimensionsMm: { width: 0, depth: 0, height: 0 },
         };
 
-        if (onAnalysisChangeRef.current && analysisChanged(emptyAnalysis)) {
+        if (analysisRef.current && analysisChanged(emptyAnalysis)) {
           lastAnalysisRef.current = emptyAnalysis;
-          onAnalysisChangeRef.current(emptyAnalysis);
+          analysisRef.current(emptyAnalysis);
         }
 
         camera.position.copy(CAMERA_HOME);
@@ -991,9 +991,9 @@ export default function STLViewer({
         },
       };
 
-      if (onAnalysisChangeRef.current && analysisChanged(nextAnalysis)) {
+      if (analysisRef.current && analysisChanged(nextAnalysis)) {
         lastAnalysisRef.current = nextAnalysis;
-        onAnalysisChangeRef.current(nextAnalysis);
+        analysisRef.current(nextAnalysis);
       }
 
       const center = aggregateBox.getCenter(new THREE.Vector3());
