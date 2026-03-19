@@ -9,6 +9,8 @@ type AccessoryItem = {
   cost: string;
 };
 
+const materialTypes = ["PLA", "PLA SILK", "PLA MATTE", "PETG", "ABS", "ASA", "TPU"];
+
 const currency = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",
@@ -16,6 +18,7 @@ const currency = new Intl.NumberFormat("en-IN", {
 });
 
 const defaultState = {
+  materialType: "PLA",
   materialCostPerGram: "2.5",
   filamentUsed: "120",
   printTime: "5",
@@ -30,6 +33,7 @@ const defaultState = {
 };
 
 export default function SellerCalculatorPage() {
+  const [materialType, setMaterialType] = useState(defaultState.materialType);
   const [materialCostPerGram, setMaterialCostPerGram] = useState(defaultState.materialCostPerGram);
   const [filamentUsed, setFilamentUsed] = useState(defaultState.filamentUsed);
   const [printTime, setPrintTime] = useState(defaultState.printTime);
@@ -72,6 +76,7 @@ export default function SellerCalculatorPage() {
   };
 
   const handleReset = () => {
+    setMaterialType(defaultState.materialType);
     setMaterialCostPerGram(defaultState.materialCostPerGram);
     setFilamentUsed(defaultState.filamentUsed);
     setPrintTime(defaultState.printTime);
@@ -134,7 +139,21 @@ export default function SellerCalculatorPage() {
           {/* Material */}
           <section className={cardClass}>
             <h2 className="text-lg font-bold text-white">Material</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <label className="text-sm text-slate-300">
+                Material type
+                <select
+                  value={materialType}
+                  onChange={(e) => setMaterialType(e.target.value)}
+                  className={inputClass}
+                >
+                  {materialTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="text-sm text-slate-300">
                 Material cost per gram (₹)
                 <input type="number" min="0" step="0.01" value={materialCostPerGram}
