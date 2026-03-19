@@ -494,6 +494,11 @@ export default function STLViewer({
   const onSelectModelRef = useRef(onSelectModel);
   const onModelPositionChangeRef = useRef(onModelPositionChange);
   const onModelFootprintsChangeRef = useRef(onModelFootprintsChange);
+  const onAnalysisChangeRef = useRef(onAnalysisChange);
+  const lastAnalysisRef = useRef<{
+    totalVolumeCm3: number;
+    dimensionsMm: { width: number; depth: number; height: number };
+  } | null>(null);
   const dragStateRef = useRef<{
     modelId: string;
     offsetX: number;
@@ -521,6 +526,26 @@ export default function STLViewer({
   useEffect(() => {
     onModelFootprintsChangeRef.current = onModelFootprintsChange;
   }, [onModelFootprintsChange]);
+
+  useEffect(() => {
+    onAnalysisChangeRef.current = onAnalysisChange;
+  }, [onAnalysisChange]);
+
+  const analysisChanged = useCallback((next: {
+    totalVolumeCm3: number;
+    dimensionsMm: { width: number; depth: number; height: number };
+  }) => {
+    const prev = lastAnalysisRef.current;
+    const epsilon = 0.01;
+    if (!prev) return true;
+
+    return (
+      Math.abs(prev.totalVolumeCm3 - next.totalVolumeCm3) > epsilon ||
+      Math.abs(prev.dimensionsMm.width - next.dimensionsMm.width) > epsilon ||
+      Math.abs(prev.dimensionsMm.depth - next.dimensionsMm.depth) > epsilon ||
+      Math.abs(prev.dimensionsMm.height - next.dimensionsMm.height) > epsilon
+    );
+  }, []);
 
   const updateBuildPlate = useCallback((_width: number, _depth: number) => {
     const scene = sceneRef.current;
@@ -926,12 +951,16 @@ export default function STLViewer({
         .filter((obj): obj is THREE.Object3D => Boolean(obj));
 
       if (visibleObjects.length === 0) {
-        if (onAnalysisChange) {
-          onAnalysisChange({
-            totalVolumeCm3: 0,
-            dimensionsMm: { width: 0, depth: 0, height: 0 },
-          });
+        const emptyAnalysis = {
+          totalVolumeCm3: 0,
+          dimensionsMm: { width: 0, depth: 0, height: 0 },
+        };
+
+        if (onAnalysisChangeRef.current && analysisChanged(emptyAnalysis)) {
+          lastAnalysisRef.current = emptyAnalysis;
+          onAnalysisChangeRef.current(emptyAnalysis);
         }
+
         camera.position.copy(CAMERA_HOME);
         camera.lookAt(0, 0, 0);
         controls.target.set(0, 0, 0);
@@ -952,19 +981,21 @@ export default function STLViewer({
         totalVolumeCm3 += entry.baseVolumeCm3 * Math.pow(model.scale, 3);
       });
 
-      if (onAnalysisChange) {
-        const size = aggregateBox.getSize(new THREE.Vector3());
-        onAnalysisChange({
-          totalVolumeCm3,
-          dimensionsMm: {
-            width: size.x,
-            depth: size.y,
-            height: size.z,
-          },
-        });
+      const size = aggregateBox.getSize(new THREE.Vector3());
+      const nextAnalysis = {
+        totalVolumeCm3,
+        dimensionsMm: {
+          width: size.x,
+          depth: size.y,
+          height: size.z,
+        },
+      };
+
+      if (onAnalysisChangeRef.current && analysisChanged(nextAnalysis)) {
+        lastAnalysisRef.current = nextAnalysis;
+        onAnalysisChangeRef.current(nextAnalysis);
       }
 
-      const size = aggregateBox.getSize(new THREE.Vector3());
       const center = aggregateBox.getCenter(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z, 1);
       const halfFovY = THREE.MathUtils.degToRad(camera.fov / 2);
@@ -1098,7 +1129,7 @@ export default function STLViewer({
 
     void loadMissingModels();
     applyTransformsAndAnalyze();
-  }, [models, selectedModelId, buildPlate.width, buildPlate.depth, onAnalysisChange, simpleView]);
+  }, [models, selectedModelId, buildPlate.width, buildPlate.depth, simpleView, analysisChanged]);
 
   useEffect(() => {
     if (modelMapRef.current.size === 0) return;

@@ -95,12 +95,12 @@ const QUALITY_MULTIPLIER: Record<PrintQuality, number> = {
 };
 
 const MATERIAL_COST_PER_GRAM: Record<MaterialType, number> = {
-  PLA: 3.0,
-  "PLA Silk": 3.6,
-  PETG: 3.4,
+  PLA: 3,
+  "PLA Silk": 3.5,
+  PETG: 4,
   ABS: 3.5,
   ASA: 3.8,
-  TPU: 4.2,
+  TPU: 6,
 };
 
 const MATERIAL_LIBRARY: Record<
@@ -166,6 +166,18 @@ const COLOR_OPTIONS = [
   { name: "Yellow", value: "#eab308" },
   { name: "Orange", value: "#f97316" },
   { name: "Gray", value: "#9ca3af" },
+  { name: "Purple", value: "#7c3aed" },
+  { name: "Pink", value: "#ec4899" },
+  { name: "Gold", value: "#d4af37" },
+  { name: "Silver", value: "#c0c0c0" },
+  { name: "Transparent", value: "#e5e7eb" },
+  { name: "Wood", value: "#8b5a2b" },
+];
+
+const PLA_SILK_COLOR_OPTIONS = [
+  { name: "Silk Gold", value: "#d4af37" },
+  { name: "Silk Silver", value: "#c0c0c0" },
+  { name: "Silk Rainbow", value: "#ff4dc4" },
 ];
 
 export default function Calculator() {
@@ -207,6 +219,8 @@ export default function Calculator() {
   const [orderError, setOrderError] = useState("");
   const [isOrdering, setIsOrdering] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const roughlyEqual = (a: number, b: number, epsilon = 0.01) => Math.abs(a - b) <= epsilon;
 
   const parseNumber = (value: string) => {
     const parsed = parseFloat(value);
@@ -280,18 +294,42 @@ export default function Calculator() {
     }
   };
 
-  const handleAnalysisChange = useCallback((payload: {
+  const handleAnalysisChange = useCallback((payload?: {
     totalVolumeCm3: number;
     dimensionsMm: { width: number; depth: number; height: number };
   }) => {
-    setModelVolume(payload.totalVolumeCm3);
-    setModelDimensions(payload.dimensionsMm);
+    if (!payload) return;
+
+    setModelVolume((prev) => (
+      roughlyEqual(prev, payload.totalVolumeCm3) ? prev : payload.totalVolumeCm3
+    ));
+
+    setModelDimensions((prev) => {
+      const next = payload.dimensionsMm;
+      const unchanged =
+        roughlyEqual(prev.width, next.width) &&
+        roughlyEqual(prev.depth, next.depth) &&
+        roughlyEqual(prev.height, next.height);
+
+      return unchanged ? prev : next;
+    });
   }, []);
 
   const selectedMaterialConfig = useMemo(
     () => MATERIAL_LIBRARY[materialType],
     [materialType]
   );
+
+  const availableColorOptions = useMemo(
+    () => (materialType === "PLA Silk" ? PLA_SILK_COLOR_OPTIONS : COLOR_OPTIONS),
+    [materialType]
+  );
+
+  useEffect(() => {
+    if (!availableColorOptions.some((option) => option.value === filamentColor)) {
+      setFilamentColor(availableColorOptions[0]?.value ?? "#ffffff");
+    }
+  }, [availableColorOptions, filamentColor]);
 
   useEffect(() => {
     const profile = PRINTER_PROFILES[selectedPrinter];
@@ -560,7 +598,7 @@ export default function Calculator() {
         </p>
       </section>
 
-      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
+      <section className={`rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl transition-all duration-300 dark:border-white/10 dark:bg-slate-950/70 ${models.length > 0 ? "" : "mx-auto max-w-2xl"}`}>
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Upload Model</p>
         <h2 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">STL / OBJ / 3MF Upload</h2>
         <label className="mt-4 flex items-start gap-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
@@ -598,22 +636,30 @@ export default function Calculator() {
 
       <div className="text-center text-sm font-semibold text-slate-400">↓</div>
 
-      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
+      <section className={`rounded-[24px] border border-black/10 bg-white/80 p-5 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl transition-all duration-300 dark:border-white/10 dark:bg-slate-950/70 ${models.length > 0 ? "" : "mx-auto max-w-2xl"}`}>
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">3D Model Preview</p>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Interactive preview: drag to rotate, scroll to zoom, and right-drag to pan.</p>
-        <div className="mt-4 rounded-[22px] border border-black/10 bg-slate-100/80 p-3 dark:border-white/8 dark:bg-slate-900/70 md:p-4">
-          <STLViewer
-            models={models}
-            selectedModelId={selectedModelId}
-            filamentColor={filamentColor}
-            simpleView
-            buildPlate={{
-              width: selectedPrinterDetails.buildVolume.width,
-              depth: selectedPrinterDetails.buildVolume.depth,
-            }}
-            onAnalysisChange={handleAnalysisChange}
-          />
-        </div>
+        {models.length > 0 ? (
+          <>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Interactive preview: drag to rotate, scroll to zoom, and right-drag to pan.</p>
+            <div className="mt-4 rounded-[22px] border border-black/10 bg-slate-100/80 p-3 dark:border-white/8 dark:bg-slate-900/70 md:p-4">
+              <STLViewer
+                models={models}
+                selectedModelId={selectedModelId}
+                filamentColor={filamentColor}
+                simpleView
+                buildPlate={{
+                  width: selectedPrinterDetails.buildVolume.width,
+                  depth: selectedPrinterDetails.buildVolume.depth,
+                }}
+                onAnalysisChange={handleAnalysisChange}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="mt-4 rounded-2xl border border-dashed border-black/15 bg-slate-100/70 px-4 py-6 text-center text-sm font-medium text-slate-600 transition-all duration-300 dark:border-white/15 dark:bg-slate-900/50 dark:text-slate-300">
+            Upload STL to preview your model
+          </div>
+        )}
       </section>
 
       <div className="text-center text-sm font-semibold text-slate-400">↓</div>
@@ -688,7 +734,7 @@ export default function Calculator() {
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Filament Color</p>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {COLOR_OPTIONS.map((option) => (
+            {availableColorOptions.map((option) => (
               <button
                 key={option.value}
                 type="button"
