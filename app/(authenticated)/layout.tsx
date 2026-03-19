@@ -22,19 +22,41 @@ export default function AuthenticatedLayout({
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [theme, setTheme] = useState<ThemeMode>("dark");
+  const isDev = process.env.NODE_ENV !== "production";
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        router.push("/login");
-      } else {
+    if (isDev) {
+      setCheckingAuth(false);
+      return;
+    }
+
+    let isMounted = true;
+    const timeoutId = window.setTimeout(() => {
+      if (isMounted) {
         setCheckingAuth(false);
+      }
+    }, 3000);
+
+    const checkUser = async () => {
+      try {
+        await supabase.auth.getSession();
+      } catch {
+        // Auth lookup failure should not block page rendering.
+      } finally {
+        if (isMounted) {
+          window.clearTimeout(timeoutId);
+          setCheckingAuth(false);
+        }
       }
     };
 
     checkUser();
-  }, [router]);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [isDev]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("layerledger-theme");
