@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -10,6 +10,8 @@ type NavItem = {
   href?: string;
   action?: () => Promise<void>;
 };
+
+const SHOW_ADVANCED_MENU = false;
 
 export default function AuthenticatedLayout({
   children,
@@ -80,17 +82,61 @@ export default function AuthenticatedLayout({
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
-  const navItems: NavItem[] = useMemo(
-    () => [
-      { label: "Dashboard", href: "/dashboard" },
-      { label: "Upload STL", href: "/calculator" },
-      { label: "Seller Calculator", href: "/seller-calculator" },
-      { label: "Jobs", href: "/jobs" },
-      { label: "Settings", href: "/settings" },
-      { label: "Logout", action: handleLogout },
-    ],
-    []
-  );
+  const renderDesktopNavLink = (item: NavItem) => {
+    if (!item.href) {
+      return null;
+    }
+
+    const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+    const classes = `flex w-full items-center rounded-2xl border px-4 py-3 text-sm font-medium transition-all duration-200 ${
+      isActive
+        ? "border-green-400/35 bg-green-500/15 text-green-300 shadow-[0_0_40px_rgba(34,197,94,0.12)]"
+        : "border-white/8 bg-white/5 text-slate-200 hover:bg-white/10"
+    }`;
+
+    return (
+      <Link key={item.label} href={item.href} className={classes}>
+        {item.label}
+      </Link>
+    );
+  };
+
+  const renderDesktopNavAction = (item: NavItem) => {
+    if (!item.action) {
+      return null;
+    }
+
+    const classes =
+      "flex w-full items-center rounded-2xl border border-white/8 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition-all duration-200 hover:bg-white/10";
+
+    return (
+      <button key={item.label} onClick={item.action} className={classes}>
+        {item.label}
+      </button>
+    );
+  };
+
+  const renderMobileNavLink = (item: NavItem) => {
+    if (!item.href) {
+      return null;
+    }
+
+    const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+    return (
+      <Link
+        key={item.label}
+        href={item.href}
+        className={`rounded-xl border px-3 py-2 text-center text-xs font-medium transition-all duration-200 ${
+          isActive
+            ? "border-green-400/35 bg-green-500/15 text-green-300"
+            : "border-white/8 bg-white/5 text-slate-200 hover:bg-white/10"
+        }`}
+      >
+        {item.label}
+      </Link>
+    );
+  };
 
   if (checkingAuth) {
     return (
@@ -124,31 +170,13 @@ export default function AuthenticatedLayout({
         </button>
 
         <nav className="mt-8 space-y-2">
-          {navItems.map((item) => {
-            const isActive = item.href
-              ? pathname === item.href || pathname.startsWith(`${item.href}/`)
-              : false;
-
-            const classes = `flex w-full items-center rounded-2xl border px-4 py-3 text-sm font-medium transition-all duration-200 ${
-              isActive
-                ? "border-green-400/35 bg-green-500/15 text-green-300 shadow-[0_0_40px_rgba(34,197,94,0.12)]"
-                : "border-white/8 bg-white/5 text-slate-200 hover:bg-white/10"
-            }`;
-
-            if (item.href) {
-              return (
-                <Link key={item.label} href={item.href} className={classes}>
-                  {item.label}
-                </Link>
-              );
-            }
-
-            return (
-              <button key={item.label} onClick={item.action} className={classes}>
-                {item.label}
-              </button>
-            );
-          })}
+          {SHOW_ADVANCED_MENU && renderDesktopNavLink({ label: "Dashboard", href: "/dashboard" })}
+          {renderDesktopNavLink({ label: "Upload STL", href: "/calculator" })}
+          {SHOW_ADVANCED_MENU &&
+            renderDesktopNavLink({ label: "Seller Calculator", href: "/seller-calculator" })}
+          {SHOW_ADVANCED_MENU && renderDesktopNavLink({ label: "Jobs", href: "/jobs" })}
+          {SHOW_ADVANCED_MENU && renderDesktopNavLink({ label: "Settings", href: "/settings" })}
+          {renderDesktopNavAction({ label: "Logout", action: handleLogout })}
         </nav>
       </aside>
 
@@ -173,24 +201,12 @@ export default function AuthenticatedLayout({
           </div>
         </div>
         <nav className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {navItems
-            .filter((item) => item.href)
-            .map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href as string}
-                  className={`rounded-xl border px-3 py-2 text-center text-xs font-medium transition-all duration-200 ${
-                    isActive
-                      ? "border-green-400/35 bg-green-500/15 text-green-300"
-                      : "border-white/8 bg-white/5 text-slate-200 hover:bg-white/10"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+          {SHOW_ADVANCED_MENU && renderMobileNavLink({ label: "Dashboard", href: "/dashboard" })}
+          {renderMobileNavLink({ label: "Upload STL", href: "/calculator" })}
+          {SHOW_ADVANCED_MENU &&
+            renderMobileNavLink({ label: "Seller Calculator", href: "/seller-calculator" })}
+          {SHOW_ADVANCED_MENU && renderMobileNavLink({ label: "Jobs", href: "/jobs" })}
+          {SHOW_ADVANCED_MENU && renderMobileNavLink({ label: "Settings", href: "/settings" })}
         </nav>
       </header>
 

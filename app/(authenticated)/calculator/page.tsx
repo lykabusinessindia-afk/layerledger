@@ -84,7 +84,7 @@ const TOP_BOTTOM_FACTOR = 0.15;     // top and bottom solid layers
 const SUPPORTS_FACTOR = 0.05;       // estimated support material
 const SLICER_EFFICIENCY_FACTOR = 0.65; // extrusion path efficiency vs raw volume
 
-type MaterialType = "PLA" | "PETG" | "ABS" | "TPU" | "ASA" | "PLA+";
+type MaterialType = "PLA" | "PETG" | "PLA Silk" | "TPU";
 
 const MATERIAL_LIBRARY: Record<
   MaterialType,
@@ -110,12 +110,12 @@ const MATERIAL_LIBRARY: Record<
     temperature: "230-250 degC",
     badgeClass: "bg-cyan-500/20 text-cyan-300 border-cyan-400/30",
   },
-  ABS: {
-    name: "ABS",
-    density: 1.04,
-    defaultSpeed: 55,
-    temperature: "230-260 degC",
-    badgeClass: "bg-amber-500/20 text-amber-300 border-amber-400/30",
+  "PLA Silk": {
+    name: "PLA Silk",
+    density: 1.22,
+    defaultSpeed: 45,
+    temperature: "205-220 degC",
+    badgeClass: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/30",
   },
   TPU: {
     name: "TPU",
@@ -124,31 +124,64 @@ const MATERIAL_LIBRARY: Record<
     temperature: "210-230 degC",
     badgeClass: "bg-violet-500/20 text-violet-300 border-violet-400/30",
   },
-  ASA: {
-    name: "ASA",
-    density: 1.07,
-    defaultSpeed: 50,
-    temperature: "240-260 degC",
-    badgeClass: "bg-orange-500/20 text-orange-300 border-orange-400/30",
-  },
-  "PLA+": {
-    name: "PLA+",
-    density: 1.24,
-    defaultSpeed: 65,
-    temperature: "205-220 degC",
-    badgeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30",
-  },
 };
 
-const COLOR_OPTIONS = [
-  { name: "White", value: "#ffffff" },
-  { name: "Black", value: "#000000" },
-  { name: "Red", value: "#ef4444" },
-  { name: "Blue", value: "#3b82f6" },
-  { name: "Green", value: "#22c55e" },
-  { name: "Yellow", value: "#eab308" },
-  { name: "Orange", value: "#f97316" },
-  { name: "Gray", value: "#9ca3af" },
+type ColorOption = {
+  name: string;
+  value: string;
+  swatchStyle?: {
+    backgroundColor?: string;
+    backgroundImage?: string;
+  };
+};
+
+const COLOR_OPTIONS: ColorOption[] = [
+  { name: "White", value: "#ffffff", swatchStyle: { backgroundColor: "#ffffff" } },
+  { name: "Black", value: "#000000", swatchStyle: { backgroundColor: "#000000" } },
+  { name: "Red", value: "#ef4444", swatchStyle: { backgroundColor: "#ef4444" } },
+  { name: "Blue", value: "#3b82f6", swatchStyle: { backgroundColor: "#3b82f6" } },
+  { name: "Green", value: "#22c55e", swatchStyle: { backgroundColor: "#22c55e" } },
+  { name: "Yellow", value: "#eab308", swatchStyle: { backgroundColor: "#eab308" } },
+  { name: "Orange", value: "#f97316", swatchStyle: { backgroundColor: "#f97316" } },
+  { name: "Gray", value: "#9ca3af", swatchStyle: { backgroundColor: "#9ca3af" } },
+  { name: "Purple", value: "#8b5cf6", swatchStyle: { backgroundColor: "#8b5cf6" } },
+  { name: "Pink", value: "#ec4899", swatchStyle: { backgroundColor: "#ec4899" } },
+  { name: "Brown", value: "#92400e", swatchStyle: { backgroundColor: "#92400e" } },
+  { name: "Gold", value: "#d4af37", swatchStyle: { backgroundColor: "#d4af37" } },
+  { name: "Silver", value: "#c0c0c0", swatchStyle: { backgroundColor: "#c0c0c0" } },
+  {
+    name: "Transparent",
+    value: "#e5e7eb",
+    swatchStyle: {
+      backgroundImage: "linear-gradient(135deg, rgba(255,255,255,0.95), rgba(226,232,240,0.55))",
+    },
+  },
+  { name: "Neon Green", value: "#39ff14", swatchStyle: { backgroundColor: "#39ff14" } },
+  { name: "Neon Yellow", value: "#faff00", swatchStyle: { backgroundColor: "#faff00" } },
+  { name: "Sky Blue", value: "#38bdf8", swatchStyle: { backgroundColor: "#38bdf8" } },
+  { name: "Navy Blue", value: "#1e3a8a", swatchStyle: { backgroundColor: "#1e3a8a" } },
+  { name: "Maroon", value: "#7f1d1d", swatchStyle: { backgroundColor: "#7f1d1d" } },
+  { name: "Olive", value: "#6b8e23", swatchStyle: { backgroundColor: "#6b8e23" } },
+  { name: "Teal", value: "#0f766e", swatchStyle: { backgroundColor: "#0f766e" } },
+  { name: "Beige", value: "#d6c6a5", swatchStyle: { backgroundColor: "#d6c6a5" } },
+  { name: "Ivory", value: "#fff8e7", swatchStyle: { backgroundColor: "#fff8e7" } },
+  { name: "Copper", value: "#b87333", swatchStyle: { backgroundColor: "#b87333" } },
+  { name: "Matte Black", value: "#111827", swatchStyle: { backgroundColor: "#111827" } },
+  { name: "Matte White", value: "#f8fafc", swatchStyle: { backgroundColor: "#f8fafc" } },
+  {
+    name: "Gradient",
+    value: "#a855f7",
+    swatchStyle: {
+      backgroundImage: "linear-gradient(135deg, #a855f7, #ec4899, #f59e0b)",
+    },
+  },
+  {
+    name: "Rainbow",
+    value: "#ff4d6d",
+    swatchStyle: {
+      backgroundImage: "linear-gradient(135deg, #ef4444, #f59e0b, #eab308, #22c55e, #3b82f6, #8b5cf6)",
+    },
+  },
 ];
 
 export default function Calculator() {
@@ -167,7 +200,7 @@ export default function Calculator() {
   const profitMargin = "30";
 
   const [materialType, setMaterialType] = useState<MaterialType>("PLA");
-  const [filamentColor, setFilamentColor] = useState("#00ff88");
+  const [filamentColor, setFilamentColor] = useState(COLOR_OPTIONS[0].value);
   const [selectedPrinter, setSelectedPrinter] = useState(PRINTER_OPTIONS[0].name);
 
   const [models, setModels] = useState<ViewerModel[]>([]);
@@ -475,21 +508,6 @@ export default function Calculator() {
     }
   };
 
-  const analysisCards = [
-    {
-      label: "Estimated Filament Usage (±10% accuracy)",
-      value: `${filamentUsed || "0.00"} g`,
-    },
-    {
-      label: "Dimensions",
-      value: `${modelDimensions.width.toFixed(2)} × ${modelDimensions.depth.toFixed(2)} × ${modelDimensions.height.toFixed(2)} mm`,
-    },
-    {
-      label: "Print Time",
-      value: `${estimatedPrintTime.toFixed(2)} hrs`,
-    },
-  ];
-
   return (
     <div className="layerledger-content mx-auto max-w-4xl space-y-5">
       <section className="rounded-[28px] border border-black/10 bg-white/80 p-6 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_30px_80px_rgba(0,0,0,0.35)] md:p-8">
@@ -557,23 +575,6 @@ export default function Calculator() {
 
       <div className="text-center text-sm font-semibold text-slate-400">↓</div>
 
-      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Printer Selection</p>
-        <select
-          value={selectedPrinter}
-          onChange={(e) => setSelectedPrinter(e.target.value)}
-          className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-3 text-sm text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white"
-        >
-          {PRINTER_OPTIONS.map((printer) => (
-            <option key={printer.name} value={printer.name}>
-              {printer.name} - {printer.buildVolume.width} × {printer.buildVolume.depth} × {printer.buildVolume.height} mm
-            </option>
-          ))}
-        </select>
-      </section>
-
-      <div className="text-center text-sm font-semibold text-slate-400">↓</div>
-
       <section className="grid gap-5 rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 md:grid-cols-2">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Material Selection</p>
@@ -605,25 +606,14 @@ export default function Calculator() {
                     : "border-black/10 bg-white hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
                 }`}
               >
-                <span className="inline-block h-3.5 w-3.5 rounded-full border border-black/20 dark:border-white/20" style={{ backgroundColor: option.value }} />
+                <span
+                  className="inline-block h-3.5 w-3.5 rounded-full border border-black/20 dark:border-white/20"
+                  style={option.swatchStyle ?? { backgroundColor: option.value }}
+                />
                 <span className="text-xs text-slate-900 dark:text-white">{option.name}</span>
               </button>
             ))}
           </div>
-        </div>
-      </section>
-
-      <div className="text-center text-sm font-semibold text-slate-400">↓</div>
-
-      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Model Analysis</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {analysisCards.map((item) => (
-            <div key={item.label} className="rounded-xl border border-black/10 bg-slate-100/80 p-3.5 dark:border-white/8 dark:bg-slate-900/80">
-              <p className="text-xs text-slate-500 dark:text-slate-400">{item.label}</p>
-              <p className="mt-1.5 text-base font-semibold text-slate-900 dark:text-white">{item.value}</p>
-            </div>
-          ))}
         </div>
       </section>
 
@@ -634,21 +624,6 @@ export default function Calculator() {
         <div className="mt-4 rounded-2xl border border-black/10 bg-white/80 p-5 text-center dark:border-white/10 dark:bg-black/20">
           <p className="text-xs uppercase tracking-[0.24em] text-emerald-800/70 dark:text-green-200/70">Estimated Quote</p>
           <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">₹{instantPriceQuote.toFixed(2)}</p>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-          <div className="rounded-xl border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-black/20">
-            <p className="text-[10px] text-slate-500 dark:text-green-100/70">Filament</p>
-            <p className="mt-1 font-semibold text-slate-900 dark:text-white">₹ {filamentCost.toFixed(2)}</p>
-          </div>
-          <div className="rounded-xl border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-black/20">
-            <p className="text-[10px] text-slate-500 dark:text-green-100/70">Electricity</p>
-            <p className="mt-1 font-semibold text-slate-900 dark:text-white">₹ {electricityCost.toFixed(2)}</p>
-          </div>
-          <div className="rounded-xl border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-black/20">
-            <p className="text-[10px] text-slate-500 dark:text-green-100/70">Machine</p>
-            <p className="mt-1 font-semibold text-slate-900 dark:text-white">₹ {machineCost.toFixed(2)}</p>
-          </div>
         </div>
 
         <button
