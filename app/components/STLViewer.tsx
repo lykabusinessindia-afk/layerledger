@@ -608,7 +608,9 @@ export default function STLViewer({
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
@@ -735,9 +737,9 @@ export default function STLViewer({
     controls.enableZoom = true;
     controlsRef.current = controls;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.62));
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.12);
-    directionalLight.position.set(190, 160, 260);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    directionalLight.position.set(5, 5, 5);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.set(2048, 2048);
     directionalLight.shadow.camera.near = 10;
@@ -1029,8 +1031,8 @@ export default function STLViewer({
               geometry,
               new THREE.MeshStandardMaterial({
                 color: filamentColorRef.current,
-                metalness: 0.15,
-                roughness: 0.65,
+                metalness: 0.2,
+                roughness: 0.4,
               })
             );
           } else if (ext === "obj") {
@@ -1040,8 +1042,8 @@ export default function STLViewer({
               if (child instanceof THREE.Mesh) {
                 child.material = new THREE.MeshStandardMaterial({
                   color: filamentColorRef.current,
-                  metalness: 0.15,
-                  roughness: 0.65,
+                  metalness: 0.2,
+                  roughness: 0.4,
                 });
                 child.geometry.computeVertexNormals();
               }
@@ -1052,8 +1054,8 @@ export default function STLViewer({
               if (child instanceof THREE.Mesh) {
                 child.material = new THREE.MeshStandardMaterial({
                   color: filamentColorRef.current,
-                  metalness: 0.15,
-                  roughness: 0.65,
+                  metalness: 0.2,
+                  roughness: 0.4,
                 });
                 child.geometry.computeVertexNormals();
               }

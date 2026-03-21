@@ -85,6 +85,20 @@ export async function POST(request: Request) {
     }
 
     for (const lineItem of payload.line_items ?? []) {
+      const refMatch = lineItem.title.match(/\[Ref:([^\]]+)\]/);
+      const orderRef = refMatch?.[1]?.trim();
+
+      if (orderRef) {
+        const { error: paymentUpdateError } = await supabaseAdmin
+          .from("order_payments")
+          .update({ status: "Token Paid" })
+          .eq("order_ref", orderRef);
+
+        if (paymentUpdateError) {
+          console.error("Failed to mark token as paid", paymentUpdateError);
+        }
+      }
+
       const properties = toPropertyMap(lineItem.properties);
       const fileUrl = properties.STL_File || properties.modelFile || "";
       const printer = properties.Printer || "Unknown";

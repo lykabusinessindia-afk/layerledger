@@ -7,6 +7,7 @@ type CreateProductRequest = {
   time?: string;
   material?: string;
   stlUrl?: string;
+  orderRef?: string;
 };
 
 const escapeHtml = (value: string) =>
@@ -23,6 +24,7 @@ const buildProductBodyHtml = (payload: CreateProductRequest) => {
   const time = escapeHtml(payload.time ?? "Not provided");
   const material = escapeHtml(payload.material ?? "Not provided");
   const stlUrl = escapeHtml(payload.stlUrl ?? "");
+  const orderRef = escapeHtml(payload.orderRef ?? "");
 
   return `
     <h2>${title}</h2>
@@ -31,6 +33,7 @@ const buildProductBodyHtml = (payload: CreateProductRequest) => {
       <li><strong>Estimated weight:</strong> ${weight}</li>
       <li><strong>Estimated print time:</strong> ${time}</li>
       <li><strong>Material:</strong> ${material}</li>
+      ${orderRef ? `<li><strong>Order reference:</strong> ${orderRef}</li>` : ""}
       ${stlUrl ? `<li><strong>STL file:</strong> <a href="${stlUrl}" target="_blank" rel="noopener noreferrer">View uploaded model</a></li>` : ""}
     </ul>
   `.trim();

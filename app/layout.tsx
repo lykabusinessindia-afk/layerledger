@@ -49,17 +49,6 @@ export default function RootLayout({
       >
         {children}
 
-        <footer className="text-center text-gray-800 text-sm py-6 border-t border-gray-300 bg-white">
-          <div className="space-x-4">
-            <a href="/privacy-policy" className="hover:text-green-400">
-              Privacy Policy
-            </a>
-            <a href="/terms" className="hover:text-green-400">
-              Terms of Service
-            </a>
-          </div>
-        </footer>
-
         <Script id="register-sw" strategy="afterInteractive">
           {`
             if ('serviceWorker' in navigator) {

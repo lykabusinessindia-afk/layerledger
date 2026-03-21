@@ -1,8 +1,9 @@
 "use client";
 import { useMemo, useState, useCallback, useRef, useEffect, type ChangeEvent } from "react";
+import Script from "next/script";
 import STLViewer from "@/components/STLViewer";
 import type { ViewerModel } from "@/components/STLViewer";
-import { calculatePricingBreakdown } from "@/lib/pricing";
+import { supabase } from "@/lib/supabase";
 
 type PrinterOption = {
   name: string;
@@ -46,6 +47,20 @@ type PrinterProfile = {
   machineCostPerHour: number;
 };
 
+type ModelDimensions = {
+  width: number;
+  depth: number;
+  height: number;
+};
+
+type ModelSizeInputs = {
+  width: string;
+  depth: string;
+  height: string;
+};
+
+type SizeUnit = "mm" | "cm" | "inches";
+
 const PRINTER_PROFILES: Record<string, PrinterProfile> = {
   "Ender 3": { power: 250, speed: 60, machineCostPerHour: 10 },
   "Ender 3 V3 SE": { power: 260, speed: 80, machineCostPerHour: 10 },
@@ -83,6 +98,14 @@ const DEFAULT_INFILL_PERCENTAGE = 0.22; // default infill (22 %)
 const TOP_BOTTOM_FACTOR = 0.15;     // top and bottom solid layers
 const SUPPORTS_FACTOR = 0.05;       // estimated support material
 const SLICER_EFFICIENCY_FACTOR = 0.65; // extrusion path efficiency vs raw volume
+
+const SIZE_UNIT_TO_MM: Record<SizeUnit, number> = {
+  mm: 1,
+  cm: 10,
+  inches: 25.4,
+};
+
+const MIN_SIZE_MM = 1;
 
 type MaterialType = "PLA" | "PETG" | "PLA Silk" | "TPU";
 
@@ -125,6 +148,25 @@ const MATERIAL_LIBRARY: Record<
     badgeClass: "bg-violet-500/20 text-violet-300 border-violet-400/30",
   },
 };
+
+type PrintQuality = "Draft" | "Standard" | "High";
+
+const PRINT_QUALITY_OPTIONS: PrintQuality[] = ["Draft", "Standard", "High"];
+
+const MATERIAL_RATES: Record<MaterialType, number> = {
+  PLA: 3,
+  PETG: 4,
+  "PLA Silk": 5,
+  TPU: 6,
+};
+
+const QUALITY_MULTIPLIERS: Record<PrintQuality, number> = {
+  Draft: 0.8,
+  Standard: 1.0,
+  High: 1.3,
+};
+
+const BASE_FACTOR = 1.375;
 
 type ColorOption = {
   name: string;
@@ -185,6 +227,10 @@ const COLOR_OPTIONS: ColorOption[] = [
 ];
 
 export default function Calculator() {
+  const TOKEN_PERCENTAGE = 0.3;
+  const TOKEN_CONFIRMATION_MESSAGE =
+    "Order placed with 30% advance. Final price will be confirmed after slicing.";
+
   const defaultPrinterProfile = PRINTER_PROFILES[PRINTER_OPTIONS[0].name];
 
   const [filamentUsed, setFilamentUsed] = useState("");
@@ -192,30 +238,47 @@ export default function Calculator() {
   const [printSpeedMmPerSecond, setPrintSpeedMmPerSecond] = useState(String(defaultPrinterProfile.speed));
   const [machineCostPerHour, setMachineCostPerHour] = useState(String(defaultPrinterProfile.machineCostPerHour));
 
-  // Internal pricing configuration (kept out of customer UI)
-  const filamentPricePerKg = "1200";
-  const electricityRate = "10";
-  const packagingCost = "0";
-  const shippingCost = "0";
-  const profitMargin = "30";
-
   const [materialType, setMaterialType] = useState<MaterialType>("PLA");
+  const [materialRate, setMaterialRate] = useState(MATERIAL_RATES.PLA);
+  const [materialWeightInput, setMaterialWeightInput] = useState("");
+  const [quantity, setQuantity] = useState("1");
   const [filamentColor, setFilamentColor] = useState(COLOR_OPTIONS[0].value);
+  const [printQuality, setPrintQuality] = useState<PrintQuality>("Standard");
   const [selectedPrinter, setSelectedPrinter] = useState(PRINTER_OPTIONS[0].name);
 
   const [models, setModels] = useState<ViewerModel[]>([]);
+  const [uploadedModelUrls, setUploadedModelUrls] = useState<Record<string, string>>({});
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  const [modelVolume, setModelVolume] = useState(0);
   const [estimatedPrintTime, setEstimatedPrintTime] = useState(0);
-  const [modelDimensions, setModelDimensions] = useState({
+  const [modelDimensions, setModelDimensions] = useState<ModelDimensions>({
     width: 0,
     depth: 0,
     height: 0,
   });
+  const [modelSizeInputs, setModelSizeInputs] = useState<ModelSizeInputs>({
+    width: "",
+    depth: "",
+    height: "",
+  });
+  const [modelSizeUnit, setModelSizeUnit] = useState<SizeUnit>("mm");
   const [ownershipConfirmed, setOwnershipConfirmed] = useState(false);
   const [showOwnershipWarning, setShowOwnershipWarning] = useState(false);
   const [orderError, setOrderError] = useState("");
+  const [orderConfirmationMessage, setOrderConfirmationMessage] = useState("");
   const [isOrdering, setIsOrdering] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [isLoggedInUser, setIsLoggedInUser] = useState(false);
+  const [isEmailLocked, setIsEmailLocked] = useState(false);
+  const [isEmailLoading, setIsEmailLoading] = useState(true);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
+  const [customerCity, setCustomerCity] = useState("");
+  const [customerState, setCustomerState] = useState("");
+  const [customerPincode, setCustomerPincode] = useState("");
+  const [modalValidationError, setModalValidationError] = useState("");
+  const [isProcessingModal, setIsProcessingModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parseNumber = (value: string) => {
@@ -223,17 +286,114 @@ export default function Calculator() {
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
-  const isSupportedModelFile = (file: File) => {
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    return ext === "stl" || ext === "obj" || ext === "3mf";
+  const handleModelSizeInputChange = (field: keyof ModelSizeInputs, value: string) => {
+    if (value === "") {
+      setModelSizeInputs((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+      return;
+    }
+
+    const normalizedValue = value.replace(/,/g, ".");
+    const parsedValue = Number(normalizedValue);
+
+    if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+      return;
+    }
+
+    setModelSizeInputs((prev) => ({
+      ...prev,
+      [field]: normalizedValue,
+    }));
   };
 
-  const appendModels = (incomingFiles: File[]) => {
-    const supported = incomingFiles.filter(isSupportedModelFile);
+  const handleMaterialWeightChange = (value: string) => {
+    if (value === "") {
+      setMaterialWeightInput("");
+      return;
+    }
+
+    const normalizedValue = value.replace(/,/g, ".");
+    const parsedValue = Number(normalizedValue);
+
+    if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+      return;
+    }
+
+    setMaterialWeightInput(normalizedValue);
+  };
+
+  const handleQuantityChange = (value: string) => {
+    if (value === "") {
+      setQuantity("1");
+      return;
+    }
+
+    const normalizedValue = value.replace(/,/g, ".");
+    const parsedValue = Number(normalizedValue);
+
+    if (!Number.isFinite(parsedValue) || parsedValue < 1) {
+      return;
+    }
+
+    setQuantity(String(Math.floor(parsedValue)));
+  };
+
+  const isSupportedModelFile = (file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const allowed = ["stl", "obj", "3mf"];
+    return allowed.includes(ext);
+  };
+
+  const isWithinSizeLimit = (file: File) => file.size <= 50 * 1024 * 1024;
+
+  const uploadStlToStorage = async (file: File, modelId: string) => {
+    if (!(file instanceof File) || !file.name) {
+      throw new Error("Missing file for upload");
+    }
+
+    console.log("Uploading file:", file);
+
+    const safeFileName = file.name.replace(/[\\/]/g, "_");
+    const storagePath = `uploads/${Date.now()}-${safeFileName}`;
+
+    const { data, error } = await supabase.storage
+      .from("stl-files")
+      .upload(storagePath, file, {
+        upsert: false,
+      });
+
+    if (error) {
+      console.log("Upload error:", error);
+      alert("Upload failed");
+      return;
+    }
+
+    console.log("Upload success:", data);
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("stl-files").getPublicUrl(storagePath);
+
+    if (!publicUrl) {
+      return;
+    }
+
+    setUploadedModelUrls((prev) => ({
+      ...prev,
+      [modelId]: publicUrl,
+    }));
+
+    return { success: true, fileUrl: publicUrl };
+  };
+
+  const appendModels = async (incomingFiles: File[]) => {
+    const supported = incomingFiles.filter((file) => isSupportedModelFile(file) && isWithinSizeLimit(file));
     const rejected = incomingFiles.length - supported.length;
 
     if (rejected > 0) {
-      alert("Some files were skipped. Only STL, OBJ, and 3MF files are supported.");
+      alert("Only STL, OBJ, 3MF files up to 50MB are supported");
     }
 
     if (supported.length === 0) {
@@ -260,23 +420,43 @@ export default function Calculator() {
     if (!selectedModelId) {
       setSelectedModelId(createdModels[0].id);
     }
+
+    for (const model of createdModels) {
+      try {
+        await uploadStlToStorage(model.file, model.id);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to upload STL file";
+        alert(message);
+      }
+    }
   };
 
-  const handleUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!ownershipConfirmed) {
       setShowOwnershipWarning(true);
       return;
     }
 
-    const files = e.target.files ? Array.from(e.target.files) : [];
-    appendModels(files);
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      alert("Please select a file to upload.");
+      return;
+    }
+
+    if (!isSupportedModelFile(file) || !isWithinSizeLimit(file)) {
+      alert("Only STL, OBJ, 3MF files up to 50MB are supported");
+      return;
+    }
+
+    await appendModels([file]);
     setShowOwnershipWarning(false);
   };
 
   const handleClearModel = () => {
     setModels([]);
     setSelectedModelId(null);
-    setModelVolume(0);
+    setUploadedModelUrls({});
     setEstimatedPrintTime(0);
     setModelDimensions({ width: 0, depth: 0, height: 0 });
     setFilamentUsed("0.00");
@@ -290,13 +470,132 @@ export default function Calculator() {
     totalVolumeCm3: number;
     dimensionsMm: { width: number; depth: number; height: number };
   }) => {
-    setModelVolume(payload.totalVolumeCm3);
     setModelDimensions(payload.dimensionsMm);
   }, []);
 
   const selectedMaterialConfig = useMemo(
     () => MATERIAL_LIBRARY[materialType],
     [materialType]
+  );
+
+  const qualityMultiplier = useMemo(
+    () => QUALITY_MULTIPLIERS[printQuality],
+    [printQuality]
+  );
+
+  useEffect(() => {
+    setMaterialRate(MATERIAL_RATES[materialType]);
+  }, [materialType]);
+
+  useEffect(() => {
+    const storedMessage = window.sessionStorage.getItem("layerledger-token-confirmation");
+    if (!storedMessage) {
+      return;
+    }
+
+    setOrderConfirmationMessage(storedMessage);
+    window.sessionStorage.removeItem("layerledger-token-confirmation");
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadCustomerEmail = async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const email = data.user?.email?.trim() ?? "";
+        const userId = data.user?.id ?? null;
+
+        if (!active) return;
+
+        setCurrentUserId(userId);
+
+        if (email) {
+          setCustomerEmail(email);
+          setIsLoggedInUser(true);
+          setIsEmailLocked(true);
+        } else {
+          setIsLoggedInUser(false);
+          setIsEmailLocked(false);
+        }
+      } finally {
+        if (active) {
+          setIsEmailLoading(false);
+        }
+      }
+    };
+
+    void loadCustomerEmail();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const lockEmailIfNeeded = () => {
+    if (isLoggedInUser || isEmailLocked) {
+      return;
+    }
+
+    const normalized = customerEmail.trim().toLowerCase();
+    if (!normalized) {
+      return;
+    }
+
+    setCustomerEmail(normalized);
+    setIsEmailLocked(true);
+  };
+
+  const manualModelDimensionsMm = useMemo<ModelDimensions>(() => {
+    const unitMultiplier = SIZE_UNIT_TO_MM[modelSizeUnit];
+
+    return {
+      width: parseNumber(modelSizeInputs.width) * unitMultiplier,
+      depth: parseNumber(modelSizeInputs.depth) * unitMultiplier,
+      height: parseNumber(modelSizeInputs.height) * unitMultiplier,
+    };
+  }, [modelSizeInputs, modelSizeUnit]);
+
+  const hasManualModelSize = useMemo(
+    () => Object.values(modelSizeInputs).some((value) => value.trim() !== ""),
+    [modelSizeInputs]
+  );
+
+  const hasValidManualModelSize = useMemo(
+    () =>
+      Object.values(modelSizeInputs).every((value) => value.trim() !== "") &&
+      Object.values(manualModelDimensionsMm).every((value) => value >= MIN_SIZE_MM),
+    [manualModelDimensionsMm, modelSizeInputs]
+  );
+
+  const modelSizeValidationMessage = useMemo(() => {
+    if (!hasManualModelSize) {
+      return "";
+    }
+
+    if (Object.values(modelSizeInputs).some((value) => value.trim() === "")) {
+      return "Enter X, Y, and Z to calculate a quote.";
+    }
+
+    if (Object.values(manualModelDimensionsMm).some((value) => value === 0)) {
+      return "Each dimension must be greater than 0.";
+    }
+
+    if (Object.values(manualModelDimensionsMm).some((value) => value < MIN_SIZE_MM)) {
+      return "Each dimension must be at least 1 mm.";
+    }
+
+    return "";
+  }, [hasManualModelSize, manualModelDimensionsMm, modelSizeInputs]);
+
+  const sizeInputMinimum = useMemo(
+    () => String(MIN_SIZE_MM / SIZE_UNIT_TO_MM[modelSizeUnit]),
+    [modelSizeUnit]
+  );
+
+  const modelDimensionsForCalculations = useMemo<ModelDimensions>(
+    () => (hasManualModelSize ? manualModelDimensionsMm : modelDimensions),
+    [hasManualModelSize, manualModelDimensionsMm, modelDimensions]
   );
 
   useEffect(() => {
@@ -308,106 +607,29 @@ export default function Calculator() {
     setMachineCostPerHour(String(profile.machineCostPerHour));
   }, [selectedPrinter]);
 
-  // Filament estimation — only recalculates on model change, material change, or printer profile change.
-  // This prevents the weight from fluctuating when unrelated UI fields (speed, price, etc.) are edited.
-  useEffect(() => {
-    if (modelVolume <= 0) {
-      setFilamentUsed("0.00");
-      return;
-    }
-
-    const infillPercentage = DEFAULT_INFILL_PERCENTAGE;
-    const materialDensity = MATERIAL_LIBRARY[materialType]?.density ?? 1.24;
-
-    const wallsVolume    = modelVolume * WALLS_FACTOR;
-    const infillVolume   = modelVolume * infillPercentage;
-    const topBotVolume   = modelVolume * TOP_BOTTOM_FACTOR;
-    const supportsVolume = modelVolume * SUPPORTS_FACTOR;
-
-    const bodyVolume = wallsVolume + infillVolume + topBotVolume;
-    const effectiveVolume = bodyVolume + supportsVolume;
-
-    const rawFilamentWeight = effectiveVolume * materialDensity;
-    const filamentWeight    = Math.round(rawFilamentWeight * SLICER_EFFICIENCY_FACTOR * 100) / 100;
-
-    setFilamentUsed(filamentWeight.toFixed(2));
-  }, [modelVolume, materialType, selectedPrinter]);
-
-  // Print-time estimation — recalculates on model or speed change only.
-  useEffect(() => {
-    if (modelVolume <= 0) {
-      setEstimatedPrintTime(0);
-      return;
-    }
-    const volumeMm3 = modelVolume * 1000;
-    const selectedSpeed = Math.max(parseNumber(printSpeedMmPerSecond), 1);
-    const baseFlowRate = 12; // mm³/s at 60 mm/s baseline speed
-    const flowRateMm3PerSecond = Math.max(1, baseFlowRate * (selectedSpeed / 60));
-    const estimatedHours = volumeMm3 / flowRateMm3PerSecond / 3600;
-    setEstimatedPrintTime(estimatedHours);
-  }, [modelVolume, printSpeedMmPerSecond]);
-
-  const {
-    filamentCost,
-    electricityCost,
-    machineCost,
-    totalProductionCost,
-  } = useMemo(() => {
-    const filamentUsedNum = parseNumber(filamentUsed);
-    const filamentPriceNum = parseNumber(filamentPricePerKg);
-    const printHoursNum = Math.max(estimatedPrintTime, 0);
-    const electricityRateNum = parseNumber(electricityRate);
-    const machinePowerNum = parseNumber(machinePowerWatts);
-    const machineCostPerHourNum = parseNumber(machineCostPerHour);
-    const packagingCostNum = parseNumber(packagingCost);
-    const shippingCostNum = parseNumber(shippingCost);
-
-    const filamentCost = (filamentUsedNum / 1000) * filamentPriceNum;
-
-    const electricityCost =
-      (machinePowerNum / 1000) * printHoursNum * electricityRateNum;
-
-    const machineCost = machineCostPerHourNum * printHoursNum;
-
-    const breakdown = calculatePricingBreakdown({
-      materialCostPerGram: filamentUsedNum > 0 ? filamentCost / filamentUsedNum : 0,
-      filamentUsedGrams: filamentUsedNum,
-      printTimeHours: printHoursNum,
-      machineCostPerHour: machineCostPerHourNum,
-      electricityCostPerHour: electricityRateNum * (machinePowerNum / 1000),
-      laborCost: 0,
-      accessoriesCost: 0,
-      packagingCost: packagingCostNum,
-      shippingCost: shippingCostNum,
-      failureRatePercent: 0,
-      profitMarginPercent: 0,
-      gstPercent: 0,
-    });
-
-    return {
-      filamentCost,
-      electricityCost,
-      machineCost,
-      totalProductionCost: breakdown.baseCost,
-    };
-  }, [
-    filamentUsed,
-    filamentPricePerKg,
-    estimatedPrintTime,
-    electricityRate,
-    machinePowerWatts,
-    machineCostPerHour,
-    packagingCost,
-    shippingCost,
-  ]);
+  const materialWeight = useMemo(() => parseNumber(materialWeightInput), [materialWeightInput]);
+  const isWeightProvided = materialWeightInput.trim() !== "";
+  const quantityValue = useMemo(() => Math.max(1, Math.floor(parseNumber(quantity))), [quantity]);
 
   const instantPriceQuote = useMemo(() => {
-    const profitMarginNum = parseNumber(profitMargin);
-    return totalProductionCost * (1 + profitMarginNum / 100);
-  }, [
-    totalProductionCost,
-    profitMargin,
-  ]);
+    if (materialWeight <= 0 || materialRate <= 0 || qualityMultiplier <= 0 || quantityValue <= 0) {
+      return 0;
+    }
+
+    const basePrice = materialWeight * materialRate * qualityMultiplier * BASE_FACTOR;
+    const finalPrice = basePrice * quantityValue;
+    return Math.round(finalPrice);
+  }, [materialRate, materialWeight, qualityMultiplier, quantityValue]);
+
+  const tokenBreakdownAmount = useMemo(
+    () => Math.round(instantPriceQuote * TOKEN_PERCENTAGE),
+    [instantPriceQuote, TOKEN_PERCENTAGE]
+  );
+
+  const remainingBreakdownAmount = useMemo(
+    () => Math.max(0, instantPriceQuote - tokenBreakdownAmount),
+    [instantPriceQuote, tokenBreakdownAmount]
+  );
 
   const selectedPrinterDetails = useMemo(
     () => PRINTER_OPTIONS.find((printer) => printer.name === selectedPrinter) ?? PRINTER_OPTIONS[0],
@@ -419,7 +641,103 @@ export default function Calculator() {
     [models, selectedModelId]
   );
 
+  const openCheckoutModal = () => {
+    console.log("[Order] Opening checkout modal");
+
+    if (!selectedModel) {
+      setOrderError("Upload a model before ordering.");
+      return;
+    }
+
+    const normalizedCustomerEmail = customerEmail.trim().toLowerCase();
+    const isEmailValid = /^\S+@\S+\.\S+$/.test(normalizedCustomerEmail);
+
+    if (!normalizedCustomerEmail || !isEmailValid) {
+      setOrderError("Please enter a valid email to proceed.");
+      return;
+    }
+
+    if (!isLoggedInUser && !isEmailLocked) {
+      setCustomerEmail(normalizedCustomerEmail);
+      setIsEmailLocked(true);
+    }
+
+    setModalValidationError("");
+    setShowCheckoutModal(true);
+    setOrderError("");
+  };
+
+  const validateModalForm = (): boolean => {
+    setModalValidationError("");
+
+    const phone = customerPhone.trim();
+    const address = customerAddress.trim();
+    const city = customerCity.trim();
+    const state = customerState.trim();
+    const pincode = customerPincode.trim();
+
+    if (!phone) {
+      setModalValidationError("Phone number is required.");
+      return false;
+    }
+
+    if (!/^[\d\s\-\+\(\)]{10,}$/.test(phone)) {
+      setModalValidationError("Please enter a valid phone number.");
+      return false;
+    }
+
+    if (!address) {
+      setModalValidationError("Address is required.");
+      return false;
+    }
+
+    if (!city) {
+      setModalValidationError("City is required.");
+      return false;
+    }
+
+    if (!state) {
+      setModalValidationError("State is required.");
+      return false;
+    }
+
+    if (!pincode) {
+      setModalValidationError("Pincode is required.");
+      return false;
+    }
+
+    if (!/^\d{6}$/.test(pincode)) {
+      setModalValidationError("Pincode must be 6 digits.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleContinueToPayment = async () => {
+    console.log("[Order] Continue to payment clicked");
+
+    if (!validateModalForm()) {
+      return;
+    }
+
+    setIsProcessingModal(true);
+    setModalValidationError("");
+
+    try {
+      await handleOrderThisPrint();
+      setShowCheckoutModal(false);
+    } catch (error) {
+      console.error("[Order] Error during payment:", error);
+      setModalValidationError("Failed to process order. Please try again.");
+    } finally {
+      setIsProcessingModal(false);
+    }
+  };
+
   const handleOrderThisPrint = async () => {
+    console.log("[Order] Processing payment");
+
     if (!selectedModel) {
       setOrderError("Upload a model before ordering.");
       return;
@@ -430,78 +748,190 @@ export default function Calculator() {
       return;
     }
 
+    const normalizedCustomerEmail = customerEmail.trim().toLowerCase();
+    const selectedModelFileUrl = uploadedModelUrls[selectedModel.id];
+
+    if (!selectedModelFileUrl) {
+      setOrderError("Please wait for STL upload to complete before placing the order.");
+      return;
+    }
+
     try {
       setIsOrdering(true);
       setOrderError("");
+      setOrderConfirmationMessage("");
 
-      console.log("Order This Print file check", {
-        hasFile: Boolean(selectedModel.file),
-        fileName: selectedModel.file.name,
-        fileSize: selectedModel.file.size,
-      });
+      const final_price = Math.max(0, Math.round(instantPriceQuote));
+      const token_amount = Math.max(0, Math.round(final_price * TOKEN_PERCENTAGE));
 
-      const stlReferenceUrl = `local-file://${encodeURIComponent(selectedModel.file.name)}`;
-      const selectedColorName =
-        COLOR_OPTIONS.find((option) => option.value === filamentColor)?.name ?? filamentColor;
+      console.log("[Order] Requesting Razorpay order", { final_price, token_amount });
 
-      console.log("Order This Print starting create-product API call");
-
-      const createProductResponse = await fetch("/api/create-product", {
+      const response = await fetch("/api/create-razorpay-order", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: `${selectedModel.name} 3D Print`,
-          price: instantPriceQuote.toFixed(2),
-          weight: `${filamentUsed || "0.00"} g`,
-          time: `${estimatedPrintTime.toFixed(2)} hrs`,
-          material: `${selectedMaterialConfig.name} / ${selectedColorName}`,
-          stlUrl: stlReferenceUrl,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token_amount }),
       });
 
-      const productData = (await createProductResponse.json()) as {
-        success?: boolean;
-        error?: string;
-        details?: string;
-        status?: number;
-        product?: { id?: number; handle?: string; variantId?: number };
-        cartUrl?: string;
+      console.log("[Order] API response status:", response.status);
+
+      if (!response.ok) {
+        throw new Error("Failed to create Razorpay order.");
+      }
+
+      const data = (await response.json()) as { success?: boolean; order_id?: string; amount?: number; error?: string };
+      console.log("[Order] API response data:", data);
+
+      if (!data.success || !data.order_id) {
+        throw new Error(data.error || "Missing order_id from API response.");
+      }
+
+      const razorpayWindow = window as any;
+      if (!razorpayWindow.Razorpay) {
+        setOrderError("Razorpay SDK not loaded. Please refresh the page.");
+        return;
+      }
+
+      const razorpayOptions = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        order_id: data.order_id,
+        amount: data.amount ? data.amount * 100 : token_amount * 100,
+        currency: "INR",
+        name: "LYKA 3D Studio",
+        description: "3D Print Advance Payment",
+        image: "/logo.png",
+        prefill: {
+          name: "",
+          email: normalizedCustomerEmail,
+          contact: "",
+        },
+        notes: {
+          brand: "LYKA 3D Studio",
+          model: selectedModel.file.name,
+        },
+        handler: async function (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) {
+          console.log("Razorpay success:", response);
+          setOrderConfirmationMessage(TOKEN_CONFIRMATION_MESSAGE);
+
+          const enteredEmail = normalizedCustomerEmail;
+          const safeFileUrl =
+            typeof selectedModelFileUrl === "string" && selectedModelFileUrl.startsWith("http")
+              ? selectedModelFileUrl
+              : null;
+          console.log("FILE URL DEBUG:", safeFileUrl);
+          console.log("SENDING CUSTOMIZATION:", {
+            material: materialType,
+            color: filamentColor,
+            finish: printQuality,
+            scale: selectedModel?.scale,
+            quantity: quantity,
+          });
+          const customization = {
+            color: filamentColor,
+            material: materialType,
+            finish: printQuality,
+            scale: selectedModel?.scale,
+            quantity: quantity,
+          };
+          const xValue = modelSizeInputs.width;
+          const yValue = modelSizeInputs.depth;
+          const zValue = modelSizeInputs.height;
+          const safeSize = {
+            x: Number(xValue) || null,
+            y: Number(yValue) || null,
+            z: Number(zValue) || null,
+          };
+          const updatedCustomization = {
+            ...customization,
+            size: safeSize,
+          };
+          console.log("Sending size:", safeSize);
+
+          try {
+            const res = await fetch("/api/save-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: enteredEmail,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                amount: token_amount,
+                status: "paid",
+                material: materialType,
+                color: filamentColor,
+                finish: printQuality,
+                scale: selectedModel?.scale,
+                quantity: quantity,
+                file_url: safeFileUrl,
+                customization: updatedCustomization,
+              }),
+            });
+
+            const data = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string };
+
+            if (!data.success) {
+              console.error("Order save failed:", data.error);
+              alert("Payment received but order not saved. Contact support.");
+            }
+
+            console.log("Order saved successfully");
+          } catch (error) {
+            console.error("Order save failed", error);
+            alert("Payment received but order not saved. Contact support.");
+          }
+          
+          try {
+            const shopifyResponse = await fetch("/api/create-shopify-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                token_amount,
+                customer_email: normalizedCustomerEmail,
+                customer_phone: customerPhone.trim(),
+                customer_address: customerAddress.trim(),
+                customer_city: customerCity.trim(),
+                customer_state: customerState.trim(),
+                customer_pincode: customerPincode.trim(),
+              }),
+            });
+
+            if (shopifyResponse.ok) {
+              const shopifyData = (await shopifyResponse.json()) as { shopify_order_id?: number };
+              const shopifyOrderId = shopifyData.shopify_order_id;
+
+              // Insert order record into Supabase (non-blocking)
+              if (shopifyOrderId && normalizedCustomerEmail) {
+                void fetch("/api/insert-order-record", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    email: normalizedCustomerEmail,
+                    order_id: shopifyOrderId,
+                    amount: token_amount,
+                    status: "Paid",
+                  }),
+                }).catch((error) => {
+                  console.log("[Order] Supabase record insert failed (non-blocking)", error);
+                });
+              }
+            }
+          } catch (error) {
+            console.log("[Order] Shopify order creation failed", error);
+          }
+
+          window.location.href = "/payment-success";
+        },
+        theme: {
+          color: "#22c55e",
+        },
       };
 
-      console.log("Create product API response", {
-        httpStatus: createProductResponse.status,
-        body: productData,
-      });
-
-      if (
-        !createProductResponse.ok ||
-        (typeof productData.status === "number" && productData.status >= 400) ||
-        productData.error
-      ) {
-        throw new Error(productData.details || productData.error || "Failed to create Shopify product");
-      }
-
-      const cartUrl = productData.cartUrl;
-      if (!cartUrl) {
-        throw new Error("Shopify cart/checkout URL missing from response");
-      }
-
-      console.log("Order This Print product created", {
-        productId: productData.product?.id,
-        handle: productData.product?.handle,
-        variantId: productData.product?.variantId,
-      });
-      console.log("Order This Print Variant ID:", productData.product?.variantId);
-      console.log("Order This Print Checkout URL:", cartUrl);
-
-      window.location.href = cartUrl;
+      const razorpay = new razorpayWindow.Razorpay(razorpayOptions);
+      console.log("[Order] Opening Razorpay checkout");
+      razorpay.open();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not create Shopify product.";
-      console.error("Order This Print failed", {
-        message,
-      });
+      const message = error instanceof Error ? error.message : "Could not place order.";
+      console.error("[Order] Error:", message);
       setOrderError(message);
     } finally {
       setIsOrdering(false);
@@ -509,17 +939,27 @@ export default function Calculator() {
   };
 
   return (
-    <div className="layerledger-content mx-auto max-w-4xl space-y-5">
-      <section className="rounded-[28px] border border-black/10 bg-white/80 p-6 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_30px_80px_rgba(0,0,0,0.35)] md:p-8">
-        <h1 className="text-center text-3xl font-black tracking-tight text-slate-900 dark:text-white md:text-4xl">Upload Your STL</h1>
+    <>
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="lazyOnload"
+        onLoad={() => console.log("[Razorpay] Script loaded")}
+        onError={() => console.error("[Razorpay] Script failed to load")}
+      />
+      <div className="min-h-screen bg-[#020617] bg-[radial-gradient(circle_at_12%_10%,rgba(168,85,247,0.22),transparent_40%),radial-gradient(circle_at_88%_92%,rgba(59,130,246,0.2),transparent_42%),linear-gradient(to_bottom_right,#020617,#0f172a)] text-white">
+      <div className="layerledger-content mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
+      <section className="rounded-[28px] border border-violet-400/20 bg-slate-950/65 p-6 shadow-[0_14px_40px_rgba(59,130,246,0.16),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl opacity-90 transition-all duration-300 hover:opacity-100 md:p-8">
+        <h1 className="text-center text-3xl font-black tracking-tight text-white md:text-4xl">Upload Your STL</h1>
         <p className="mx-auto mt-3 max-w-2xl text-center text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
           Upload your 3D model, customize your print, and place your order.
         </p>
       </section>
 
-      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
+      <div className="relative flex items-center justify-center">
+      <div className="pointer-events-none absolute -inset-6 rounded-[36px] bg-gradient-to-r from-purple-500 via-blue-500 to-transparent opacity-30 blur-3xl" />
+      <section className="relative z-10 w-full scale-[1.02] rounded-[24px] border border-violet-400/30 bg-slate-950/78 p-5 shadow-[0_0_60px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl md:scale-[1.05]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Upload Model</p>
-        <h2 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">STL / OBJ / 3MF Upload</h2>
+        <h2 className="mt-2 text-lg font-semibold text-white">STL / OBJ / 3MF Upload</h2>
         <label className="mt-4 flex items-start gap-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
           <input
             type="checkbox"
@@ -542,23 +982,24 @@ export default function Calculator() {
           multiple
           onChange={handleUpload}
           disabled={!ownershipConfirmed}
-          className="mt-4 block w-full text-sm text-slate-700 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-300 dark:file:bg-white/10"
+          className="mt-4 block w-full rounded-xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] file:mr-3 file:rounded-xl file:border-0 file:bg-violet-500/20 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white focus:outline-none focus:ring-2 focus:ring-violet-400/60 disabled:cursor-not-allowed disabled:opacity-60"
         />
 
         <button
           onClick={handleClearModel}
-          className="mt-4 w-full rounded-2xl border border-black/10 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 transition-all hover:bg-slate-200 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+          className="mt-4 w-full rounded-2xl border border-violet-400/25 bg-slate-900/75 px-4 py-3 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all hover:bg-slate-800/85"
         >
           Clear Model
         </button>
       </section>
+      </div>
 
-      <div className="text-center text-sm font-semibold text-slate-400">↓</div>
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-violet-400/55 to-transparent shadow-[0_0_16px_rgba(99,102,241,0.45)]" />
 
-      <section className="rounded-[24px] border border-black/10 bg-white/80 p-5 shadow-[0_20px_60px_rgba(2,6,23,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
+      <section className="rounded-[24px] border border-blue-400/20 bg-slate-950/65 p-5 shadow-[0_12px_34px_rgba(59,130,246,0.15),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl opacity-90 transition-all duration-300 hover:opacity-100">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">3D Model Preview</p>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Preview only. Your model is auto-positioned for quoting.</p>
-        <div className="mt-4 rounded-[22px] border border-black/10 bg-slate-100/80 p-3 dark:border-white/8 dark:bg-slate-900/70 md:p-4">
+        <div className="mt-4 rounded-[22px] border border-blue-400/20 bg-slate-950/85 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] md:p-4">
           <STLViewer
             models={models}
             selectedModelId={selectedModelId}
@@ -573,15 +1014,104 @@ export default function Calculator() {
         </div>
       </section>
 
-      <div className="text-center text-sm font-semibold text-slate-400">↓</div>
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-blue-400/45 to-transparent shadow-[0_0_14px_rgba(59,130,246,0.35)]" />
 
-      <section className="grid gap-5 rounded-[24px] border border-black/10 bg-white/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 md:grid-cols-2">
+      <section className="rounded-[24px] border border-violet-400/20 bg-slate-950/65 p-5 shadow-[0_12px_34px_rgba(99,102,241,0.14),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl opacity-90 transition-all duration-300 hover:opacity-100">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Model Size Customization</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">X (Width)</label>
+            <input
+              type="number"
+              min={sizeInputMinimum}
+              step="any"
+              inputMode="decimal"
+              value={modelSizeInputs.width}
+              onChange={(e) => handleModelSizeInputChange("width", e.target.value)}
+              className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Y (Depth)</label>
+            <input
+              type="number"
+              min={sizeInputMinimum}
+              step="any"
+              inputMode="decimal"
+              value={modelSizeInputs.depth}
+              onChange={(e) => handleModelSizeInputChange("depth", e.target.value)}
+              className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Z (Height)</label>
+            <input
+              type="number"
+              min={sizeInputMinimum}
+              step="any"
+              inputMode="decimal"
+              value={modelSizeInputs.height}
+              onChange={(e) => handleModelSizeInputChange("height", e.target.value)}
+              className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Unit</label>
+            <select
+              value={modelSizeUnit}
+              onChange={(e) => setModelSizeUnit(e.target.value as SizeUnit)}
+              className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+            >
+              <option value="mm">mm</option>
+              <option value="cm">cm</option>
+              <option value="inches">inches</option>
+            </select>
+          </div>
+        </div>
+        {modelSizeValidationMessage ? (
+          <p className="mt-3 text-xs text-amber-600 dark:text-amber-300">
+            {modelSizeValidationMessage}
+          </p>
+        ) : (
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+            {hasManualModelSize
+              ? `Converted internally to ${modelDimensionsForCalculations.width.toFixed(2)} × ${modelDimensionsForCalculations.depth.toFixed(2)} × ${modelDimensionsForCalculations.height.toFixed(2)} mm.`
+              : "Values are converted internally to mm for calculations."}
+          </p>
+        )}
+      </section>
+
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-violet-400/45 to-transparent shadow-[0_0_14px_rgba(99,102,241,0.35)]" />
+
+      <section className="rounded-[24px] border border-blue-400/20 bg-slate-950/65 p-5 shadow-[0_12px_34px_rgba(59,130,246,0.14),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl opacity-90 transition-all duration-300 hover:opacity-100">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Material Weight</p>
+        <div className="mt-4">
+          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Weight (grams)</label>
+          <input
+            type="number"
+            min="0"
+            step="any"
+            inputMode="decimal"
+            value={materialWeightInput}
+            onChange={(e) => handleMaterialWeightChange(e.target.value)}
+            placeholder="Enter weight in grams (e.g., 120)"
+            className="mt-2 w-full rounded-2xl border border-blue-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white placeholder:text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-blue-400/60"
+          />
+        </div>
+      </section>
+
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-blue-400/45 to-transparent shadow-[0_0_14px_rgba(59,130,246,0.35)]" />
+
+      <section className="grid gap-5 rounded-[24px] border border-violet-400/20 bg-slate-950/65 p-5 shadow-[0_12px_34px_rgba(99,102,241,0.14),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl opacity-90 transition-all duration-300 hover:opacity-100 md:grid-cols-2">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Material Selection</p>
           <select
             value={materialType}
             onChange={(e) => setMaterialType(e.target.value as MaterialType)}
-            className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-3 text-sm text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            className="mt-3 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
           >
             {(Object.keys(MATERIAL_LIBRARY) as MaterialType[]).map((materialKey) => (
               <option key={materialKey} value={materialKey}>
@@ -590,6 +1120,42 @@ export default function Calculator() {
             ))}
           </select>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Temperature: {selectedMaterialConfig.temperature}</p>
+
+          <div className="mt-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Print Quality</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {PRINT_QUALITY_OPTIONS.map((quality) => (
+                <button
+                  key={quality}
+                  type="button"
+                  onClick={() => setPrintQuality(quality)}
+                  className={`flex items-center justify-center rounded-xl border px-2.5 py-2 text-center text-xs transition-all ${
+                    printQuality === quality
+                      ? "border-none bg-gradient-to-r from-violet-400 to-blue-400 text-black shadow-[0_0_18px_rgba(99,102,241,0.45)]"
+                      : "border-violet-400/25 bg-slate-900/70 text-slate-200 hover:bg-slate-800/80"
+                  }`}
+                >
+                  {quality}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-500 dark:text-green-300">Quantity</p>
+            <div className="mt-3">
+              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Number of Prints</label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                value={quantity}
+                onChange={(e) => handleQuantityChange(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+              />
+            </div>
+          </div>
         </div>
 
         <div>
@@ -600,43 +1166,209 @@ export default function Calculator() {
                 key={option.value}
                 type="button"
                 onClick={() => setFilamentColor(option.value)}
-                className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition-all ${
+                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-left text-sm transition-all ${
                   filamentColor === option.value
-                    ? "border-green-500/50 bg-green-50 dark:border-green-400/40 dark:bg-green-500/10"
-                    : "border-black/10 bg-white hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                    ? "border-none bg-gradient-to-r from-violet-400 to-blue-400 text-black shadow-[0_0_18px_rgba(99,102,241,0.45)]"
+                    : "border-violet-400/25 bg-slate-900/70 text-white hover:bg-slate-800/80"
                 }`}
               >
                 <span
                   className="inline-block h-3.5 w-3.5 rounded-full border border-black/20 dark:border-white/20"
                   style={option.swatchStyle ?? { backgroundColor: option.value }}
                 />
-                <span className="text-xs text-slate-900 dark:text-white">{option.name}</span>
+                <span className="text-xs">{option.name}</span>
               </button>
             ))}
           </div>
         </div>
       </section>
 
-      <div className="text-center text-sm font-semibold text-slate-400">↓</div>
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-violet-400/50 to-transparent shadow-[0_0_16px_rgba(99,102,241,0.45)]" />
 
-      <section className="rounded-[24px] border border-green-500/30 bg-gradient-to-br from-green-100/70 via-emerald-100/50 to-white p-5 shadow-[0_24px_80px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-green-400/20 dark:from-green-500/20 dark:via-emerald-500/12 dark:to-slate-950/90 dark:shadow-[0_24px_80px_rgba(0,0,0,0.3)]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-green-200">Instant Price Quote</p>
-        <div className="mt-4 rounded-2xl border border-black/10 bg-white/80 p-5 text-center dark:border-white/10 dark:bg-black/20">
-          <p className="text-xs uppercase tracking-[0.24em] text-emerald-800/70 dark:text-green-200/70">Estimated Quote</p>
-          <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">₹{instantPriceQuote.toFixed(2)}</p>
+      <section className="rounded-[24px] border border-violet-400/25 bg-gradient-to-br from-violet-500/10 via-blue-500/8 to-slate-950/70 p-5 shadow-[0_20px_60px_rgba(99,102,241,0.22),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl opacity-95 transition-all duration-300 hover:opacity-100">
+        <p className="text-green-400 font-semibold tracking-widest text-sm opacity-100">Instant Price Quote</p>
+        <div className="mt-4 rounded-2xl border border-violet-400/25 bg-slate-950/80 p-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+          <p className="text-gray-300 text-sm tracking-wide">Estimated Quote</p>
+          <p className="text-white text-4xl font-bold">₹{instantPriceQuote.toFixed(2)}</p>
+          <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">Estimated Delivery: 3-5 days (after final payment)</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Production and dispatch will begin only after the remaining balance is paid.</p>
+          <div className="mt-4 grid gap-2 text-left text-sm text-slate-700 dark:text-slate-200">
+            <p>Estimated Price: ₹{instantPriceQuote.toFixed(2)}</p>
+            <p className="font-bold text-green-700 dark:text-green-300">Token (30%): ₹{tokenBreakdownAmount.toFixed(2)}</p>
+            <p className="text-slate-500 dark:text-slate-400">Remaining: ₹{remainingBreakdownAmount.toFixed(2)}</p>
+            <p className="pt-1 text-xs text-slate-500 dark:text-slate-400">Final price may vary slightly after model slicing.</p>
+            <div className="pt-1 text-xs text-slate-600 dark:text-slate-300">
+              <p>Step 1: Pay advance</p>
+              <p>Step 2: We slice model &amp; confirm price</p>
+              <p>Step 3: Pay remaining</p>
+              <p>Step 4: We print &amp; ship</p>
+            </div>
+          </div>
         </div>
+
+        <p className="text-green-300 text-sm font-medium text-center opacity-100">
+          You are paying 30% advance (<span className="font-black text-green-700 dark:text-green-300">₹{tokenBreakdownAmount.toFixed(2)}</span>)
+        </p>
+
+        <div className="mt-4 rounded-2xl border border-violet-400/25 bg-slate-950/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            Email {isLoggedInUser ? "(auto-filled)" : "(required)"}
+          </label>
+          <input
+            type="email"
+            value={customerEmail}
+            onChange={(e) => {
+              if (isLoggedInUser || isEmailLocked) {
+                return;
+              }
+              setCustomerEmail(e.target.value);
+            }}
+            onBlur={lockEmailIfNeeded}
+            readOnly={isLoggedInUser || isEmailLocked}
+            required
+            placeholder={isEmailLoading ? "Loading email..." : "you@example.com"}
+            className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+          />
+          {!isLoggedInUser && isEmailLocked ? (
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Email is locked for this order to keep payment and order records consistent.</p>
+          ) : null}
+        </div>
+
+        {showCheckoutModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl border border-violet-400/30 bg-slate-950/92 p-6 shadow-[0_20px_80px_rgba(99,102,241,0.35),inset_0_1px_0_rgba(255,255,255,0.08)]">
+              <h2 className="text-center text-2xl font-bold text-white">Complete Your Details</h2>
+              <p className="mt-2 text-center text-sm text-slate-600 dark:text-slate-400">Add your contact and address information</p>
+
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Email</label>
+                  <input
+                    type="email"
+                    value={customerEmail}
+                    readOnly
+                    className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Phone *</label>
+                  <input
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    placeholder="+91 9876543210"
+                    className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white placeholder:text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Address *</label>
+                  <input
+                    type="text"
+                    value={customerAddress}
+                    onChange={(e) => setCustomerAddress(e.target.value)}
+                    placeholder="Street address"
+                    className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white placeholder:text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">City *</label>
+                    <input
+                      type="text"
+                      value={customerCity}
+                      onChange={(e) => setCustomerCity(e.target.value)}
+                      placeholder="City"
+                      className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white placeholder:text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">State *</label>
+                    <input
+                      type="text"
+                      value={customerState}
+                      onChange={(e) => setCustomerState(e.target.value)}
+                      placeholder="State"
+                      className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white placeholder:text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Pincode *</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={customerPincode}
+                    onChange={(e) => setCustomerPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="000000"
+                    maxLength={6}
+                    className="mt-2 w-full rounded-2xl border border-violet-400/25 bg-slate-950/90 px-3 py-3 text-sm text-white placeholder:text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] focus:outline-none focus:ring-2 focus:ring-violet-400/60"
+                  />
+                </div>
+              </div>
+
+              {modalValidationError && (
+                <p className="mt-4 text-sm font-semibold text-red-600 dark:text-red-400">{modalValidationError}</p>
+              )}
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCheckoutModal(false);
+                    setModalValidationError("");
+                  }}
+                  disabled={isProcessingModal}
+                  className="flex-1 rounded-2xl border border-violet-400/25 bg-slate-900/70 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-slate-800/80 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleContinueToPayment}
+                  disabled={isProcessingModal}
+                  className="flex-1 rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_0_26px_rgba(99,102,241,0.35)] transition-all hover:scale-[1.02] hover:shadow-[0_0_34px_rgba(59,130,246,0.5)] disabled:opacity-60"
+                >
+                  {isProcessingModal ? "Processing..." : "Continue to Payment"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <button
           type="button"
-          onClick={handleOrderThisPrint}
-          disabled={!selectedModel || isOrdering}
-          className="mt-6 w-full rounded-2xl bg-gradient-to-r from-green-500 to-emerald-400 px-6 py-4 text-lg font-black text-black shadow-[0_12px_40px_rgba(34,197,94,0.24)] transition-all duration-200 hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={openCheckoutModal}
+          disabled={!selectedModel || isOrdering || !isWeightProvided || instantPriceQuote <= 0 || isEmailLoading}
+          className="mt-6 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 px-6 py-4 text-lg font-black text-white shadow-[0_0_28px_rgba(99,102,241,0.35)] transition-all duration-200 hover:scale-[1.03] hover:shadow-[0_0_42px_rgba(59,130,246,0.55)] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isOrdering ? "Preparing Your Print..." : "Order This Print"}
+          {isOrdering ? "Processing..." : `Pay ₹${tokenBreakdownAmount.toFixed(2)} & Start Printing`}
         </button>
 
+        <p className="mt-3 text-center text-xs font-semibold text-slate-600 dark:text-slate-300">🔒 Secure Payment via Razorpay</p>
+
+        {orderConfirmationMessage ? (
+          <p className="mt-3 text-sm font-semibold text-green-700 dark:text-green-300">
+            {orderConfirmationMessage}
+          </p>
+        ) : null}
         {orderError ? <p className="mt-3 text-sm font-semibold text-red-600 dark:text-red-400">{orderError}</p> : null}
+
+        <footer className="mt-6 flex items-center justify-center gap-3 text-sm text-slate-300">
+          <span className="cursor-pointer hover:text-green-400 transition">
+            Privacy Policy
+          </span>
+          <span className="text-white/10">|</span>
+          <span className="cursor-pointer hover:text-green-400 transition">
+            Terms of Service
+          </span>
+        </footer>
       </section>
     </div>
+    </div>
+    </>
   );
 }

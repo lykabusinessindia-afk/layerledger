@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import crypto from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
-const ALLOWED_EXTENSIONS = new Set(["stl", "obj", "3mf"]);
+const ALLOWED_EXTENSIONS = ["stl", "obj", "3mf"];
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+const VALIDATION_MESSAGE = "Only STL, OBJ, 3MF files up to 50MB are supported";
 
 const sanitizeFileName = (name: string) => {
   const safe = name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -22,11 +22,12 @@ export async function POST(request: Request) {
     }
 
     const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-    if (!ALLOWED_EXTENSIONS.has(extension)) {
-      return NextResponse.json(
-        { error: "Only STL, OBJ, and 3MF files are supported" },
-        { status: 400 }
-      );
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      return NextResponse.json({ error: VALIDATION_MESSAGE }, { status: 400 });
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      return NextResponse.json({ error: VALIDATION_MESSAGE }, { status: 400 });
     }
 
     const orderId =
@@ -35,22 +36,34 @@ export async function POST(request: Request) {
         : crypto.randomUUID();
 
     const fileName = sanitizeFileName(file.name);
-    const uploadDir = path.join(process.cwd(), "public", "uploads", orderId);
-    const targetPath = path.join(uploadDir, fileName);
-
-    await mkdir(uploadDir, { recursive: true });
-
     const bytes = await file.arrayBuffer();
-    await writeFile(targetPath, Buffer.from(bytes));
-
-    const baseUrl = new URL(request.url).origin;
-    const fileUrl = `${baseUrl}/uploads/${orderId}/${encodeURIComponent(fileName)}`;
+    const fileBuffer = Buffer.from(bytes);
+    const storagePath = `${orderId}/${Date.now()}-${fileName}`;
 
     const userIdInput = formData.get("userId");
     const userId = typeof userIdInput === "string" && userIdInput.trim() ? userIdInput.trim() : null;
 
+    const supabaseAdmin = getSupabaseAdmin();
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from("stl-files")
+      .upload(storagePath, fileBuffer, {
+        contentType: "model/stl",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("Storage upload error", uploadError);
+      return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
+    }
+
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from("stl-files")
+      .getPublicUrl(storagePath);
+
+    const fileUrl = publicUrlData.publicUrl;
+
     try {
-      const supabaseAdmin = getSupabaseAdmin();
       await supabaseAdmin.from("uploaded_models").insert({
         user_id: userId,
         order_id: orderId,
@@ -62,7 +75,7 @@ export async function POST(request: Request) {
       // Upload should still succeed even if DB persistence is not configured yet.
     }
 
-    return NextResponse.json({ fileUrl, orderId });
+    return NextResponse.json({ fileUrl, orderId, storagePath });
   } catch (error) {
     console.error("Upload API error", error);
     return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
