@@ -63,7 +63,7 @@ export default function AdminPage() {
 
         const { data: orders, error } = await supabase
           .from("orders")
-          .select("*")
+          .select("*, phone, address, city, state, pincode")
           .order("created_at", { ascending: false });
 
         if (error) {

@@ -21,24 +21,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as InsertOrderRecordPayload;
-
-    // Validate email is required
-    if (!body.email) {
-      console.error("[Insert Order Record] Email is required");
-      return NextResponse.json(
-        { success: false, error: "Email is required" },
-        { status: 400 }
-      );
-    }
+    const body = await request.json();
+    console.log("RECEIVED BODY:", body);
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
     const { error } = await supabase.from("orders").insert({
-      customer_email: body.email.trim(),
-      payment_id: `shopify-${body.order_id}`,
-      token_paid: body.amount,
-      order_status: body.status || "pending",
+      customer_email: body.email,
+      phone: body.phone,
+      address: body.address,
+      city: body.city,
+      state: body.state,
+      pincode: body.pincode,
+      amount: body.amount,
+      status: body.status,
+      payment_id: `shopify-${body.order_id || body.id || null}`,
     });
 
     if (error) {
@@ -48,8 +45,8 @@ export async function POST(request: Request) {
     }
 
     console.log("[Insert Order Record] Order record inserted successfully", {
-      email: body.email,
-      order_id: body.order_id,
+      email: body?.email,
+      order_id: body?.order_id || body?.id || null,
     });
 
     return NextResponse.json({ success: true });

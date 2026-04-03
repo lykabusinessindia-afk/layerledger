@@ -200,6 +200,13 @@ export default function AuthenticatedLayout({
           {SHOW_ADVANCED_MENU && renderDesktopNavLink({ label: "Settings", href: "/settings" })}
           {renderDesktopNavAction({ label: "Logout", action: handleLogout })}
         </nav>
+
+        {/* Branding footer anchored at the bottom */}
+        <div className="absolute bottom-4 left-0 w-full px-4">
+          <p className="text-[11px] text-slate-500 text-center select-none" style={{ letterSpacing: 0.1 }}>
+            Built by LYKA 3D Studio &bull; Powered by LayerLedger
+          </p>
+        </div>
       </aside>
 
       <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/70 px-4 py-3 backdrop-blur-xl lg:hidden">

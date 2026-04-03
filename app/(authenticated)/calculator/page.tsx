@@ -738,12 +738,26 @@ export default function Calculator() {
   const handleOrderThisPrint = async () => {
     console.log("[Order] Processing payment");
 
+    const paymentWindow = window as Window & {
+      __orderCreated?: boolean;
+      __orderSaved?: boolean;
+    };
+
+    if (paymentWindow.__orderCreated) {
+      return;
+    }
+
+    paymentWindow.__orderCreated = true;
+    paymentWindow.__orderSaved = false;
+
     if (!selectedModel) {
+      paymentWindow.__orderCreated = false;
       setOrderError("Upload a model before ordering.");
       return;
     }
 
     if (!selectedModel.file) {
+      paymentWindow.__orderCreated = false;
       setOrderError("No model file found. Please upload your model again.");
       return;
     }
@@ -752,6 +766,7 @@ export default function Calculator() {
     const selectedModelFileUrl = uploadedModelUrls[selectedModel.id];
 
     if (!selectedModelFileUrl) {
+      paymentWindow.__orderCreated = false;
       setOrderError("Please wait for STL upload to complete before placing the order.");
       return;
     }
@@ -764,6 +779,7 @@ export default function Calculator() {
       const final_price = Math.max(0, Math.round(instantPriceQuote));
       const token_amount = Math.max(0, Math.round(final_price * TOKEN_PERCENTAGE));
 
+      console.log("ORDER CREATED ONCE");
       console.log("[Order] Requesting Razorpay order", { final_price, token_amount });
 
       const response = await fetch("/api/create-razorpay-order", {
@@ -787,10 +803,20 @@ export default function Calculator() {
 
       const razorpayWindow = window as any;
       if (!razorpayWindow.Razorpay) {
+        paymentWindow.__orderCreated = false;
         setOrderError("Razorpay SDK not loaded. Please refresh the page.");
         return;
       }
-
+      localStorage.setItem(
+  "customer_details",
+  JSON.stringify({
+    phone: customerPhone,
+    address: customerAddress,
+    city: customerCity,
+    state: customerState,
+    pincode: customerPincode,
+  })
+);
       const razorpayOptions = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         order_id: data.order_id,
@@ -809,6 +835,10 @@ export default function Calculator() {
           model: selectedModel.file.name,
         },
         handler: async function (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) {
+          const guardWindow = window as Window & { __orderSaved?: boolean };
+          if (guardWindow.__orderSaved) return;
+          guardWindow.__orderSaved = true;
+
           console.log("Razorpay success:", response);
           setOrderConfirmationMessage(TOKEN_CONFIRMATION_MESSAGE);
 
@@ -846,25 +876,49 @@ export default function Calculator() {
           };
           console.log("Sending size:", safeSize);
 
+          const email = enteredEmail?.trim() || null;
+          const phone = customerPhone?.trim() || null;
+          const address = customerAddress?.trim() || null;
+          const city = customerCity?.trim() || null;
+          const state = customerState?.trim() || null;
+          const pincode = customerPincode?.trim() || null;
+
+          console.log("SENDING TO BACKEND:", {
+            email,
+            phone,
+            address,
+            city,
+            state,
+            pincode,
+          });
+
+          const saveOrderBody = {
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+            customization: updatedCustomization,
+            file_url: safeFileUrl,
+            amount: token_amount,
+            status: "paid",
+            material: materialType,
+            color: filamentColor,
+            finish: printQuality,
+            scale: selectedModel?.scale,
+            quantity: quantity,
+            ...(email ? { email } : {}),
+            ...(phone ? { phone } : {}),
+            ...(address ? { address } : {}),
+            ...(city ? { city } : {}),
+            ...(state ? { state } : {}),
+            ...(pincode ? { pincode } : {}),
+          };
+
           try {
+            console.log("API CALLED ONCE");
             const res = await fetch("/api/save-order", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                email: enteredEmail,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature,
-                amount: token_amount,
-                status: "paid",
-                material: materialType,
-                color: filamentColor,
-                finish: printQuality,
-                scale: selectedModel?.scale,
-                quantity: quantity,
-                file_url: safeFileUrl,
-                customization: updatedCustomization,
-              }),
+              body: JSON.stringify(saveOrderBody),
             });
 
             const data = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string };
@@ -879,57 +933,38 @@ export default function Calculator() {
             console.error("Order save failed", error);
             alert("Payment received but order not saved. Contact support.");
           }
-          
-          try {
-            const shopifyResponse = await fetch("/api/create-shopify-order", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                token_amount,
-                customer_email: normalizedCustomerEmail,
-                customer_phone: customerPhone.trim(),
-                customer_address: customerAddress.trim(),
-                customer_city: customerCity.trim(),
-                customer_state: customerState.trim(),
-                customer_pincode: customerPincode.trim(),
-              }),
-            });
-
-            if (shopifyResponse.ok) {
-              const shopifyData = (await shopifyResponse.json()) as { shopify_order_id?: number };
-              const shopifyOrderId = shopifyData.shopify_order_id;
-
-              // Insert order record into Supabase (non-blocking)
-              if (shopifyOrderId && normalizedCustomerEmail) {
-                void fetch("/api/insert-order-record", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    email: normalizedCustomerEmail,
-                    order_id: shopifyOrderId,
-                    amount: token_amount,
-                    status: "Paid",
-                  }),
-                }).catch((error) => {
-                  console.log("[Order] Supabase record insert failed (non-blocking)", error);
-                });
-              }
-            }
-          } catch (error) {
-            console.log("[Order] Shopify order creation failed", error);
-          }
 
           window.location.href = "/payment-success";
+        },
+        modal: {
+          ondismiss: () => {
+            paymentWindow.__orderCreated = false;
+            paymentWindow.__orderSaved = false;
+          },
         },
         theme: {
           color: "#22c55e",
         },
       };
 
+      // Ensure customer details are saved before payment
+      localStorage.setItem(
+        "customer_details",
+        JSON.stringify({
+          phone: customerPhone || "",
+          address: customerAddress || "",
+          city: customerCity || "",
+          state: customerState || "",
+          pincode: customerPincode || "",
+        })
+      );
+
       const razorpay = new razorpayWindow.Razorpay(razorpayOptions);
       console.log("[Order] Opening Razorpay checkout");
       razorpay.open();
     } catch (error) {
+      paymentWindow.__orderCreated = false;
+      paymentWindow.__orderSaved = false;
       const message = error instanceof Error ? error.message : "Could not place order.";
       console.error("[Order] Error:", message);
       setOrderError(message);

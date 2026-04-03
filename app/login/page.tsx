@@ -14,6 +14,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -91,8 +92,11 @@ export default function Login() {
   }, []);
 
   const handleUploadYourFileClick = () => {
-    loginPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    loginPanelRef.current?.focus();
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
   };
 
   return (
@@ -127,6 +131,60 @@ export default function Login() {
           style={{ background: "rgba(99,102,241,0.07)" }}
         />
       </div>
+
+      {/* Popup Modal for Upload Your File */}
+      {showModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.55)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "#101828",
+              color: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 0 40px 0 rgba(0,198,255,0.18)",
+              padding: "2.5rem 2.5rem 2rem 2.5rem",
+              minWidth: 320,
+              maxWidth: "90vw",
+              textAlign: "center",
+              position: "relative",
+              border: "1px solid rgba(0,198,255,0.18)",
+            }}
+          >
+            <button
+              onClick={handleCloseModal}
+              aria-label="Close"
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 16,
+                background: "transparent",
+                border: "none",
+                color: "#fff",
+                fontSize: 22,
+                cursor: "pointer",
+                opacity: 0.7,
+              }}
+            >
+              ×
+            </button>
+            <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 12 }}>
+              Sign in to upload your file
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main 2-column grid */}
       <div className="relative z-10 mx-auto grid min-h-screen max-w-[1200px] grid-cols-1 items-center px-6 md:grid-cols-2 md:gap-x-20 md:gap-y-12 md:px-8 lg:px-12">
@@ -222,6 +280,8 @@ export default function Login() {
                 background: "linear-gradient(90deg, #ffffff 0%, #ffffff 46%, #00ff94 62%, #00c853 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
+                lineHeight: 1.25,
+                overflow: "visible",
               }}
             >
               LayerLedger
