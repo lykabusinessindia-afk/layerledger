@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
-  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const baseUrl = process.env.NEXTAUTH_URL!;
   const url = new URL(request.url);
   const callbackUrlParam = url.searchParams.get("callbackUrl") ?? "/calculator";
 
